@@ -100,7 +100,7 @@ Novo_PNCP/
 
 ### 1. Instalar Dependências
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
 
 ### 2. Executar o Sistema

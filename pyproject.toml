@@ -1,5 +1,5 @@
 [project]
-name = "Consulta PNCP"
+name = "consulta-pncp"
 version = "0.1.0"
 description = "Sistema de busca de editais e itens no Portal Nacional de Contratações Públicas"
 requires-python = ">=3.11"
@@ -11,3 +11,11 @@ dependencies = [
     "pandas>=3.0.0",
     "requests>=2.32.5",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Inclui todos os pacotes Python encontrados
+include = ["web", "config", "export", "storage", "services", "scheduler", "api_client", "*"]
