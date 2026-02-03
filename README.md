@@ -377,5 +377,6 @@ INFO: Interrupted: saved 45000 items collected so far
 
 ---
 
-**Última Atualização**: Fevereiro de 2026
+**Última Atualização**: 03 de Fevereiro de 2026
+
 **Versão**: 2.0 (Incremental Sync + Graceful Shutdown)
