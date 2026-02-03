@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Contrato {{ contrato.sequencialContrato }}/{{ contrato.anoContrato }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Contratos</a></li>
+        <li class="breadcrumb-item active">{{ contrato.sequencialContrato }}/{{ contrato.anoContrato }}</li>
+    </ol>
+</nav>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-file-earmark-text"></i> 
+            Contrato {{ contrato.sequencialContrato }}/{{ contrato.anoContrato }}
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-muted">Orgao Contratante</h6>
+                <p>{{ contrato.orgaoEntidade.razaoSocial if contrato.orgaoEntidade else 'N/A' }}</p>
+                
+                <h6 class="text-muted">CNPJ</h6>
+                <p>{{ contrato.orgaoEntidade.cnpj if contrato.orgaoEntidade else contrato.cnpjOrgao }}</p>
+                
+                <h6 class="text-muted">Objeto</h6>
+                <p>{{ contrato.objetoContrato or 'N/A' }}</p>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted">Valor Global</h6>
+                <p class="h4 text-success">
+                    {% if contrato.valorGlobal %}
+                    R$ {{ "{:,.2f}".format(contrato.valorGlobal).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </p>
+                
+                <h6 class="text-muted">Vigencia</h6>
+                <p>{{ contrato.dataVigenciaInicio or '-' }} a {{ contrato.dataVigenciaFim or '-' }}</p>
+                
+                <h6 class="text-muted">Modalidade</h6>
+                <p>{{ contrato.modalidadeNome or 'N/A' }}</p>
+                
+                <h6 class="text-muted">Fornecedor</h6>
+                <p>{{ contrato.nomeRazaoSocialFornecedor or 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Itens do Contrato</h5>
+        <span class="badge bg-info">{{ total_itens }} itens</span>
+    </div>
+    <div class="card-body p-0">
+        {% if itens %}
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Descricao</th>
+                        <th>Unidade</th>
+                        <th>Quantidade</th>
+                        <th>Valor Unitario</th>
+                        <th>Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens %}
+                    <tr>
+                        <td>{{ item.numeroItem or loop.index }}</td>
+                        <td>{{ item.descricao or item.descricaoItem or 'N/A' }}</td>
+                        <td>{{ item.unidadeMedida or 'UN' }}</td>
+                        <td>{{ item.quantidade or '-' }}</td>
+                        <td>
+                            {% if item.valorUnitario %}
+                            R$ {{ "{:,.2f}".format(item.valorUnitario).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.valorTotal %}
+                            R$ {{ "{:,.2f}".format(item.valorTotal).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-4 text-muted"></i>
+            <p class="text-muted mt-3">Nenhum item encontrado para este contrato.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="/" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar para Lista
+    </a>
+</div>
+{% endblock %}

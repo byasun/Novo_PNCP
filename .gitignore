@@ -1,0 +1,68 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs
+*.log
+logs/
+
+# Dados
+data/
+
+# Editor e IDE
+.idea/
+.idea/misc.xml
+.vscode/
+.vscode/settings.json
+*.sublime-project
+*.sublime-workspace
+
+# Credenciais e Secrets
+.env
+.env.local
+.env.*.local
+config/.env
+config/secrets.py
+credentials.json
+API_KEY*
+
+# Python virtual environments
+.venv
+env/
+venv/
+ENV/
+.pythonlibs/
+
+# Banco de dados e Cache
+*.db
+*.sqlite
+*.sqlite3
+.cache/
+tmp/
+
+# Checkpoint sensível
+data/.*.json
+
+# OS
+Thumbs.db
+.DS_Store
+*.swp
+*.swo
+*~
