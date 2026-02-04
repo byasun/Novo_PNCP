@@ -247,19 +247,27 @@ class EditaisService:
         logger.info(f"Saved {len(itens)} itens to local storage")
     
     def update_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6):
-        logger.info(f"Fetching all editais from API...")
+        logger.info("Updating editais (preserving existing + adding/updating new)")
+
+        local_editais = self.data_manager.load_editais()
+
+        # If there is existing data, perform incremental sync to preserve all editais
+        if local_editais:
+            self.sync_editais(data_inicial, data_final, codigo_modalidade)
+            return self.data_manager.load_editais()
+
+        # First-time load (no local data): full fetch + save
+        logger.info("No local editais found. Performing full fetch...")
         editais = self.fetch_all_editais(data_inicial, data_final, codigo_modalidade)
         if editais:
-            # Final save (already saved via checkpoints, but do final save for completeness)
             self.save_editais(editais)
             logger.info(f"Successfully saved {len(editais)} editais")
-            # After saving editais, fetch items for all editais found
             try:
                 self.fetch_itens_for_all_editais(editais)
             except Exception:
                 logger.exception("Error while fetching itens for editais")
         else:
-            logger.warning(f"No editais were fetched from API")
+            logger.warning("No editais were fetched from API")
         return editais
 
     def sync_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6):

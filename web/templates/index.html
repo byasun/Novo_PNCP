@@ -113,29 +113,75 @@
 {% block extra_js %}
 <script>
 let updateInterval;
+let stableCountChecks = 0;
+let currentUpdateId = null;
 
-function startRealtimeUpdates() {
+function startRealtimeUpdates(updateId) {
+    currentUpdateId = updateId || null;
     // Update count every 2 seconds while fetching
     updateInterval = setInterval(() => {
-        fetch('/api/editais/count')
-            .then(response => response.json())
-            .then(data => {
+        Promise.all([
+            fetch('/api/editais/count').then(response => response.json()),
+            fetch('/api/status').then(response => response.json())
+        ])
+            .then(([countData, statusData]) => {
                 const totalElement = document.querySelector('h3');
                 if (totalElement) {
                     const oldTotal = parseInt(totalElement.textContent);
-                    if (data.total > oldTotal) {
-                        totalElement.textContent = data.total;
+                    if (countData.total > oldTotal) {
+                        totalElement.textContent = countData.total;
                         totalElement.style.color = '#28a745';
                         setTimeout(() => totalElement.style.color = '', 500);
-                        
-                        // Reload table if there are new editais
-                        if (data.total > oldTotal + 10) {
-                            location.reload();
-                        }
+                        stableCountChecks = 0;
+                    } else {
+                        stableCountChecks += 1;
                     }
                 }
+
+                // Stop polling when the specific update finishes
+                const schedulerStatus = statusData && statusData.scheduler ? statusData.scheduler : null;
+                if (schedulerStatus) {
+                    const finishedUpdateId = schedulerStatus.last_completed_update_id;
+                    const isRunning = schedulerStatus.is_running === true;
+                    if (!isRunning && currentUpdateId && finishedUpdateId === currentUpdateId) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                        stableCountChecks = 0;
+                        currentUpdateId = null;
+                        const btn = document.getElementById('btnUpdate');
+                        if (btn) btn.disabled = false;
+                        location.reload();
+                        return;
+                    }
+                }
+
+                // Fallback: stop polling when update finishes (no update_id available)
+                if (schedulerStatus && schedulerStatus.is_running === false && !currentUpdateId) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    stableCountChecks = 0;
+                    const btn = document.getElementById('btnUpdate');
+                    if (btn) btn.disabled = false;
+                    location.reload();
+                }
+
+                // Safety stop: if count stays stable for a while, stop polling
+                if (stableCountChecks >= 5 && updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    stableCountChecks = 0;
+                    const btn = document.getElementById('btnUpdate');
+                    if (btn) btn.disabled = false;
+                }
             })
-            .catch(error => console.log('Polling stopped'));
+            .catch(() => {
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    const btn = document.getElementById('btnUpdate');
+                    if (btn) btn.disabled = false;
+                }
+            });
     }, 2000);
 }
 
@@ -147,7 +193,7 @@ function triggerUpdate() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                startRealtimeUpdates();
+                startRealtimeUpdates(data.update_id);
             } else {
                 alert('Erro: ' + data.message);
                 btn.disabled = false;

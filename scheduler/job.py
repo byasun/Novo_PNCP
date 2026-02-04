@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -17,6 +18,8 @@ class DailyJob:
         self.exporter = Exporter()
         self.last_run = None
         self.is_running = False
+        self.current_update_id = None
+        self.last_completed_update_id = None
     
     def run_daily_update(self):
         if self.is_running:
@@ -24,6 +27,7 @@ class DailyJob:
             return
         
         self.is_running = True
+        self.current_update_id = str(uuid.uuid4())
         logger.info("=" * 50)
         logger.info("Starting daily update job...")
         logger.info("=" * 50)
@@ -33,8 +37,8 @@ class DailyJob:
             data_final = today.strftime("%Y%m%d")
             data_inicial = (today - timedelta(days=15)).strftime("%Y%m%d")
             
-            logger.info(f"Fetching editais from {data_inicial} to {data_final} with codigo_modalidade 6 (Pregão - Eletrônico)")
-            self.editais_service.update_editais(
+            logger.info(f"Daily sync: fetching editais from {data_inicial} to {data_final} with codigo_modalidade 6 (Pregão - Eletrônico)")
+            self.editais_service.sync_editais(
                 data_inicial=data_inicial,
                 data_final=data_final,
                 codigo_modalidade=6
@@ -46,6 +50,8 @@ class DailyJob:
         except Exception as e:
             logger.error(f"Error in daily update job: {e}")
         finally:
+            self.last_completed_update_id = self.current_update_id
+            self.current_update_id = None
             self.is_running = False
     
     def start(self):
@@ -84,6 +90,7 @@ class DailyJob:
             return
 
         self.is_running = True
+        self.current_update_id = str(uuid.uuid4())
         logger.info("Starting incremental update job...")
         try:
             today = datetime.now()
@@ -101,6 +108,8 @@ class DailyJob:
         except Exception as e:
             logger.error(f"Error in incremental update job: {e}")
         finally:
+            self.last_completed_update_id = self.current_update_id
+            self.current_update_id = None
             self.is_running = False
 
     def run_incremental_async(self):
@@ -128,5 +137,7 @@ class DailyJob:
         return {
             "last_run": self.last_run.isoformat() if self.last_run else None,
             "next_run": next_run.isoformat() if next_run else None,
-            "is_running": self.is_running
+            "is_running": self.is_running,
+            "current_update_id": self.current_update_id,
+            "last_completed_update_id": self.last_completed_update_id
         }

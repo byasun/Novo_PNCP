@@ -99,7 +99,11 @@ def trigger_update():
         else:
             started = daily_job.run_now_async()
         if started:
-            return jsonify({"status": "success", "message": "Update started in background"})
+            return jsonify({
+                "status": "success",
+                "message": "Update started in background",
+                "update_id": daily_job.current_update_id
+            })
         else:
             return jsonify({"status": "error", "message": "Could not start update"}), 500
     return jsonify({"status": "error", "message": "Scheduler not available"}), 500
