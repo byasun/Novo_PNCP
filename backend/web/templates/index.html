@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}PNCP - Lista de Editais{% endblock %}
+
+{% block content %}
+<!-- Cards de resumo e ações -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card stats-card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Total de Editais</h6>
+                <h3 class="mb-0">{{ total_editais }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stats-card success">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Última Atualização</h6>
+                <h5 class="mb-0">{{ last_update }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stats-card warning">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Ações</h6>
+                <button class="btn btn-primary btn-sm btn-update" onclick="triggerUpdate()" id="btnUpdate">
+                    <span class="loading-spinner spinner-border spinner-border-sm" role="status"></span>
+                    <span class="btn-text"><i class="bi bi-arrow-clockwise"></i> Atualizar Agora</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-download"></i> Downloads</h5>
+    </div>
+    <div class="card-body">
+        <div class="btn-group" role="group">
+            <!-- Links para arquivos exportados -->
+            <a href="/download/editais.csv" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Editais CSV
+            </a>
+            <a href="/download/editais.xlsx" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Editais XLSX
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de editais -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Lista de Editais - Pregão Eletrônico</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if editais %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Órgão</th>
+                        <th>Número</th>
+                        <th>Ano</th>
+                        <th>Objeto</th>
+                        <th>Valor Estimado</th>
+                        <th>Data de Publicação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for edital in editais %}
+                    {% set cnpj = edital.orgaoEntidade.cnpj if edital.orgaoEntidade else edital.cnpjOrgao %}
+                    {% set edital_key = cnpj ~ '_' ~ edital.anoCompra ~ '_' ~ edital.numeroCompra %}
+                    <!-- Linha clicável para abrir o detalhe do edital -->
+                    <tr onclick="window.location='/edital/{{ edital_key }}'">
+                        <td>
+                            <small class="text-muted">{{ edital.orgaoEntidade.razaoSocial if edital.orgaoEntidade else 'N/A' }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ edital.numeroCompra }}</span>
+                        </td>
+                        <td>{{ edital.anoCompra }}</td>
+                        <td>
+                            <span title="{{ edital.objetoCompra }}">
+                                {{ edital.objetoCompra[:80] }}{% if edital.objetoCompra|length > 80 %}...{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if edital.valorTotalEstimado %}
+                            R$ {{ "{:,.2f}".format(edital.valorTotalEstimado).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ edital.dataPublicacaoPncp[:10] if edital.dataPublicacaoPncp else '-' }}</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="text-muted mt-3">Nenhum edital encontrado.</p>
+            <p class="text-muted">Clique em "Atualizar Agora" para buscar os dados.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Controla atualização em tempo real após disparo manual
+let updateInterval;
+let stableCountChecks = 0;
+let currentUpdateId = null;
+
+function startRealtimeUpdates(updateId) {
+    currentUpdateId = updateId || null;
+    // Update count every 2 seconds while fetching
+    updateInterval = setInterval(() => {
+        Promise.all([
+            fetch('/api/editais/count').then(response => response.json()),
+            fetch('/api/status').then(response => response.json())
+        ])
+            .then(([countData, statusData]) => {
+                const totalElement = document.querySelector('h3');
+                if (totalElement) {
+                    const oldTotal = parseInt(totalElement.textContent);
+                    if (countData.total > oldTotal) {
+                        totalElement.textContent = countData.total;
+                        totalElement.style.color = '#28a745';
+                        setTimeout(() => totalElement.style.color = '', 500);
+                        stableCountChecks = 0;
+                    } else {
+                        stableCountChecks += 1;
+                    }
+                }
+
+                // Stop polling when the specific update finishes
+                const schedulerStatus = statusData && statusData.scheduler ? statusData.scheduler : null;
+                if (schedulerStatus) {
+                    const finishedUpdateId = schedulerStatus.last_completed_update_id;
+                    const isRunning = schedulerStatus.is_running === true;
+                    if (!isRunning && currentUpdateId && finishedUpdateId === currentUpdateId) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                        stableCountChecks = 0;
+                        currentUpdateId = null;
+                        const btn = document.getElementById('btnUpdate');
+                        if (btn) btn.disabled = false;
+                        location.reload();
+                        return;
+                    }
+                }
+
+                // Fallback: stop polling when update finishes (no update_id available)
+                if (schedulerStatus && schedulerStatus.is_running === false && !currentUpdateId) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    stableCountChecks = 0;
+                    const btn = document.getElementById('btnUpdate');
+                    if (btn) btn.disabled = false;
+                    location.reload();
+                }
+
+                // Safety stop: if count stays stable for a while, stop polling
+                if (stableCountChecks >= 5 && updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    stableCountChecks = 0;
+                    const btn = document.getElementById('btnUpdate');
+                    if (btn) btn.disabled = false;
+                }
+            })
+            .catch(() => {
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                    const btn = document.getElementById('btnUpdate');
+                    if (btn) btn.disabled = false;
+                }
+            });
+    }, 2000);
+}
+
+function triggerUpdate() {
+    const btn = document.getElementById('btnUpdate');
+    btn.disabled = true;
+
+    // Token CSRF para requisições POST
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    fetch('/api/trigger-update', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                startRealtimeUpdates(data.update_id);
+            } else {
+                alert('Erro: ' + data.message);
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            alert('Erro ao iniciar atualização');
+            btn.disabled = false;
+        });
+}
+
+// Start polling when page loads if there are no editais yet
+document.addEventListener('DOMContentLoaded', function() {
+    const totalElement = document.querySelector('h3');
+    if (totalElement && totalElement.textContent === '0') {
+        startRealtimeUpdates();
+    }
+});
+</script>
+{% endblock %}

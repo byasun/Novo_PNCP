@@ -1,0 +1,31 @@
+[project]
+name = "consulta-pncp"
+version = "0.1.0"
+description = "Sistema de busca de editais e itens no Portal Nacional de Contratações Públicas"
+requires-python = ">=3.11"
+dependencies = [
+    "apscheduler>=3.11.2",
+    "flask>=3.1.2",
+    "flask-cors>=4.0.0",
+    "flask-login>=0.6.3",
+    "flask-wtf>=1.2.2",
+    "gunicorn>=24.1.1",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.0",
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.5",
+    "sqlalchemy>=2.0.36",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.3",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Inclui todos os pacotes Python encontrados
+include = ["backend", "backend.*", "frontend", "frontend.*"]

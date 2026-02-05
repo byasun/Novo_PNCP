@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Bem-vindo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Acesso ao Sistema</h5>
+            </div>
+            <div class="card-body text-center">
+                <p class="text-muted mb-4">Escolha uma opção para continuar.</p>
+                <div class="d-grid gap-2">
+                    <a href="/login" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-in-right"></i> Fazer login
+                    </a>
+                    <a href="/users/new" class="btn btn-outline-success">
+                        <i class="bi bi-person-plus"></i> Criar novo usuário
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
