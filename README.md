@@ -11,6 +11,8 @@ Este projeto implementa um **sistema completo de gerenciamento de editais** com:
 - ✅ Exportação em CSV e XLSX (multi-sheet)
 - ✅ Sincronização eficiente baseada em timestamps
 - ✅ Graceful shutdown com preservação de dados
+- ✅ Autenticação com login e área protegida
+- ✅ Banco de usuários (SQLite) pronto para migração
 
 ---
 
@@ -31,11 +33,11 @@ Este projeto implementa um **sistema completo de gerenciamento de editais** com:
 ### 3. **Sistema de Checkpoint**
 - Salva progresso a cada 10 páginas
 - Resume seguramente de checkpoint-1 em caso de interrupção
-- Arquivo: `data/.editais_checkpoint.json`
+- Arquivo: `backend/data/.editais_checkpoint.json`
 - Zero perda de dados em Ctrl+C
 
 ### 4. **Busca e Filtro**
-- Interface web em `http://localhost:5000`
+- Interface web em `http://localhost:5173`
 - Busca por texto, CNPJ, número, ano
 - Visualização de detalhes com itens associados
 - Downloads de arquivos exportados
@@ -47,46 +49,35 @@ Este projeto implementa um **sistema completo de gerenciamento de editais** com:
   - "Itens Editais": Itens de cada edital
 - Sanitização de caracteres especiais para Excel
 
+### 6. **Login e Área de Usuários**
+- Primeiro acesso direciona para `/setup` para criar o usuário inicial
+- Acesso às informações somente após login
+- Sessão com CSRF e tempo configurável
+- Usuários armazenados em SQLite (`backend/data/users.db`)
+
 ---
 
 ## 🏗️ Arquitetura do Projeto
 
 ```
 Novo_PNCP/
-├── config/                      # Configurações centralizadas
-│   ├── __init__.py             # Re-exporta settings
-│   └── settings.py             # Variáveis de configuração
-├── api_client/                 # Cliente da API PNCP
-│   ├── pncp_client.py         # Requisições HTTP com checkpoint
-│   └── __init__.py
-├── services/                   # Lógica de negócio
-│   ├── editais_service.py     # Sincronização e items
-│   ├── contratos_service.py   # (Legado)
-│   ├── itens_service.py       # (Legado)
-│   └── __init__.py
-├── scheduler/                  # Agendamento de tarefas
-│   ├── job.py                 # DailyJob com incremental sync
-│   └── __init__.py
-├── storage/                    # Gerenciamento de dados
-│   ├── data_manager.py        # Carregar/salvar JSON
-│   └── __init__.py
-├── export/                     # Exportação de dados
-│   ├── exporter.py            # CSV e XLSX multi-sheet
-│   └── __init__.py
-├── web/                        # Aplicação Flask
-│   ├── app.py                 # Rotas e endpoints
-│   ├── templates/             # HTML templates
-│   └── static/                # CSS, JS, assets
-├── scripts/                    # Scripts utilitários
-│   ├── force_fetch_items.py   # Fetch manual com checkpoint
-│   └── __init__.py
-├── test/                       # Testes
-│   ├── test_api.py
-│   └── test_checkpoint_system.py
-├── data/                       # Dados persistidos
-├── logs/                       # Logs de execução
-├── main.py                     # Ponto de entrada
-├── pyproject.toml             # Dependências
+├── backend/                    # Backend Python
+│   ├── api_client/             # Cliente da API PNCP
+│   ├── config/                 # Configurações centralizadas
+│   ├── export/                 # Exportação de dados
+│   ├── scheduler/              # Agendamento de tarefas
+│   ├── scripts/                # Scripts utilitários
+│   ├── services/               # Lógica de negócio
+│   ├── storage/                # Persistência e autenticação
+│   ├── tests/                  # Testes de backend
+│   ├── web/                    # Flask: APIs e (opcional) serve SPA
+│   ├── data/                   # Dados persistidos
+│   ├── logs/                   # Logs de execução
+│   ├── pyproject.toml          # Dependências do backend
+│   └── main.py                 # Entry point do backend
+├── frontend/                   # Frontend React (Vite)
+│   └── react/                  # App React
+├── test/                       # Testes de integração
 └── README.md                   # Este arquivo
 ```
 
@@ -95,17 +86,18 @@ Novo_PNCP/
 ## 🚀 Instalação e Execução
 
 ### Pré-requisitos
-- Python 3.10+
+- Python 3.11+
+- Node.js 18+
 - pip ou uv
 
-### 1. Instalar Dependências
+### 1. Instalar Dependências (backend)
 ```bash
-pip install .
+pip install -e backend
 ```
 
-### 2. Executar o Sistema
+### 2. Executar o Backend
 ```bash
-python main.py
+python backend/main.py
 ```
 
 Sistema irá:
@@ -113,43 +105,54 @@ Sistema irá:
 - ✓ Iniciar agendador (próxima execução 03:00)
 - ✓ Iniciar servidor Flask na porta 5000
 
-### 3. Acessar Interface Web
-```
-http://localhost:5000
+### 3. Executar o Frontend (React)
+```bash
+cd frontend/react
+npm install
+npm run dev
 ```
 
-### 4. Fetch Manual com Checkpoint
+### 4. Acessar Interface Web
+```
+http://localhost:5173
+```
+
+### 5. Fetch Manual com Checkpoint
 ```bash
-python scripts/force_fetch_items.py
+python backend/scripts/force_fetch_items.py
 ```
 
 ---
 
 ## ⚙️ Configuração
 
-Edite `config/settings.py`:
+Defina as URLs e integrações em `backend/.env` e `frontend/react/.env`.
 
+### backend/.env
+```
+API_BASE_URL=https://pncp.gov.br/api/consulta/v1
+API_ITEMS_BASE_URL=https://pncp.gov.br/api/pncp/v1
+PNCP_DATABASE_URL=sqlite:///backend/data/users.db
+PNCP_FRONTEND_ORIGINS=http://localhost:5173
+```
+
+### frontend/react/.env
+```
+VITE_API_URL=http://localhost:5000
+VITE_API_PROXY_TARGET=http://localhost:5000
+```
+
+O arquivo `backend/config/settings.py` lê as URLs e integrações diretamente do `.env`.
+Parâmetros como threads, horários do scheduler e logging continuam configuráveis no próprio arquivo.
+
+### Autenticação e Banco
 ```python
-# API
-API_BASE_URL = "https://pncp.gov.br/api/consulta/v1"
-PAGE_SIZE = 50                  # Itens por página
-MAX_RETRIES = 3                 # Tentativas
+# Segurança
+SECRET_KEY = "change-me-in-production"
+SESSION_LIFETIME_MINUTES = 720
 
-# Scheduler
-SCHEDULER_HOUR = 3              # Hora da execução diária
-SCHEDULER_MINUTE = 0
-
-# Items (paralelo)
-ITEMS_FETCH_THREADS = 5
-ITEMS_FETCH_CHECKPOINT = 100    # Salvar a cada N editais
-
-# Storage
-DATA_DIR = "data"
-LOGS_DIR = "logs"
-EDITAIS_CHECKPOINT_FILE = "data/.editais_checkpoint.json"
-
-# Logging
-LOG_LEVEL = "INFO"
+# Banco de usuários
+PNCP_DATABASE_URL = "sqlite:///backend/data/users.db"
 ```
 
 ---
@@ -189,13 +192,18 @@ Retomada:
 ## 🔌 API Endpoints
 
 ```
-GET  /                              # Página inicial
-GET  /contrato/<key>                # Detalhes de 1 edital
-GET  /download/<filename>           # Download CSV/XLSX
+GET  /api/editais                    # Lista de editais
+GET  /api/editais/<key>              # Detalhes de um edital
+GET  /api/editais/<key>/itens        # Itens do edital
+GET  /api/editais/count              # Contagem
+GET  /api/status                     # Status do scheduler
+POST /api/trigger-update             # Dispara atualização
 
-POST /api/trigger-update            # Dispara atualização
-GET  /api/editais/count             # Contagem
-GET  /api/contratos                 # JSON de editais
+POST /login                          # Login
+POST /logout                         # Logout
+POST /setup                          # Criar primeiro usuário
+POST /users/new                      # Criar novo usuário
+GET  /download/<filename>            # Download CSV/XLSX
 ```
 
 ---
@@ -204,12 +212,12 @@ GET  /api/contratos                 # JSON de editais
 
 ### Arquivos Gerados
 
-**CSV** - `data/editais.csv`
+**CSV** - `backend/data/editais.csv`
 ```
 cnpj,numero,ano,modalidade,data...
 ```
 
-**XLSX** - `data/editais.xlsx`
+**XLSX** - `backend/data/editais.xlsx`
 - Aba "Editais": Lista completa
 - Aba "Itens Editais": Items com sanitização
 
@@ -245,14 +253,14 @@ finally:
 
 ## 🧪 Testes
 
-### Testar Checkpoint System
+### Unitários (backend)
 ```bash
-python test/test_checkpoint_system.py
+pytest backend/tests
 ```
 
-### Testar API
+### Integração
 ```bash
-python test/test_api.py
+pytest test/integration
 ```
 
 ---
@@ -283,6 +291,7 @@ INFO: Interrupted: saved 45000 items collected so far
 | "No module named pandas" | `pip install pandas openpyxl` |
 | Exports não aparecem | Clique "Atualizar Agora" primeiro |
 | Checkpoint não funciona | Verifique permissões da pasta data/ |
+| "The CSRF token is missing" | Recarregue a página e tente novamente |
 
 ---
 
@@ -348,13 +357,17 @@ INFO: Interrupted: saved 45000 items collected so far
 
 | Tecnologia | Uso |
 |------------|-----|
-| Python 3.10+ | Backend |
+| Python 3.11+ | Backend |
 | Flask | Web framework |
 | APScheduler | Job scheduling |
 | Requests | HTTP client |
 | Pandas | Data manipulation |
 | OpenPyXL | XLSX generation |
-| Bootstrap 5 | Frontend |
+| Flask-Login | Autenticação |
+| Flask-WTF | CSRF |
+| Flask-CORS | CORS |
+| SQLAlchemy | ORM/SQLite |
+| React (Vite) | Frontend |
 | JSON | Storage |
 
 ---
@@ -369,6 +382,8 @@ INFO: Interrupted: saved 45000 items collected so far
 - ✅ Interface web com busca e filtros
 - ✅ Download de arquivos exportados
 - ✅ API REST para atualização manual
+- ✅ Autenticação com login/CSRF
+- ✅ Banco de usuários (SQLite)
 - ✅ Sistema de logs estruturado
 - ✅ Sanitização de caracteres Excel
 - ✅ Retry automático
@@ -377,6 +392,6 @@ INFO: Interrupted: saved 45000 items collected so far
 
 ---
 
-**Última Atualização**: 03 de Fevereiro de 2026
+**Última Atualização**: 05 de Fevereiro de 2026
 
-**Versão**: 2.0 (Incremental Sync + Graceful Shutdown)
+**Versão**: 3.0 (Separação entre frontend e backend + migração do frontend para React (Vite))
