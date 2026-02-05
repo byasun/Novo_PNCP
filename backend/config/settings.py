@@ -4,6 +4,7 @@ Centraliza URLs de API, parâmetros de coleta, agendamento, logging e segurança
 """
 
 import os
+import threading
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -16,6 +17,29 @@ def _get_env(name: str, default: str | None = None, required: bool = False) -> s
 	if required and not value:
 		raise RuntimeError(f"Missing required environment variable: {name}")
 	return value
+
+
+# =============================================================================
+# FLAG DE CANCELAMENTO GLOBAL (para interrupção via Ctrl+C)
+# =============================================================================
+_cancel_flag = threading.Event()
+
+def request_cancel():
+    """Sinaliza para cancelar operações em andamento (uso: Ctrl+C handler)."""
+    _cancel_flag.set()
+
+def reset_cancel():
+    """Reseta a flag de cancelamento (chamar no início de operações)."""
+    _cancel_flag.clear()
+
+def is_cancelled():
+    """Verifica se foi solicitado cancelamento."""
+    return _cancel_flag.is_set()
+
+
+# =============================================================================
+# CONFIGURAÇÕES DE API
+# =============================================================================
 
 # URL base para buscar editais (contratações/publicação)
 API_BASE_URL = _get_env("API_BASE_URL", required=True)
@@ -30,7 +54,7 @@ RETRY_DELAY = 5
 
 # Configuração de busca paralela de itens
 ITEMS_FETCH_THREADS = 5  # Número de threads paralelas
-ITEMS_FETCH_DELAY_PER_THREAD = 0.1  # Delay por thread para evitar rate limit
+ITEMS_FETCH_DELAY_PER_THREAD = 0.2  # Delay por thread para evitar rate limit
 ITEMS_FETCH_CHECKPOINT = 100  # Salvar progresso a cada N editais
 
 # Pastas padrão (paths absolutos)

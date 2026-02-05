@@ -3,9 +3,14 @@ import time
 import logging
 import json
 import os
-from backend.config import API_BASE_URL, API_ITEMS_BASE_URL, PAGE_SIZE, MAX_RETRIES, RETRY_DELAY, EDITAIS_CHECKPOINT_FILE
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from backend.config import (
+    API_BASE_URL, API_ITEMS_BASE_URL, PAGE_SIZE, MAX_RETRIES, RETRY_DELAY, 
+    EDITAIS_CHECKPOINT_FILE, request_cancel, reset_cancel, is_cancelled
+)
 
 logger = logging.getLogger(__name__)
+
 
 class PNCPClient:
     """Cliente HTTP para a API do PNCP.
@@ -165,7 +170,13 @@ class PNCPClient:
                 return []
     
     def get_editais(self, page=1, size=PAGE_SIZE, data_inicial=None, data_final=None, codigo_modalidade=None):
-        # Lista editais (contratações publicadas) com filtros
+        """Lista editais (contratações A RECEBER/RECEBENDO PROPOSTAS) com filtros.
+        
+        IMPORTANT: For /contratacoes/proposta endpoint, 'dataFinal' represents the
+        MAXIMUM date for proposal reception period, NOT a search date filter.
+        Use a far future date (e.g., 20501231) to include all editais currently
+        open for receiving proposals.
+        """
         params = {"pagina": page, "tamanhoPagina": size}
         if data_inicial:
             params["dataInicial"] = data_inicial
@@ -175,8 +186,8 @@ class PNCPClient:
             params["codigoModalidadeContratacao"] = codigo_modalidade
         
         try:
-            # Editais/Contratações are obtained from /contratacoes/publicacao endpoint
-            return self._make_request("/contratacoes/publicacao", params)
+            # Editais/Contratações com recebimento de propostas aberto
+            return self._make_request("/contratacoes/proposta", params)
         except Exception as e:
             logger.error(f"Error fetching editais page {page}: {e}")
             return None
@@ -243,87 +254,136 @@ class PNCPClient:
         logger.info(f"Finished fetching contratos. Total collected: {len(all_contratos)}")
         return all_contratos
     
-    def get_all_editais(self, data_inicial=None, data_final=None, codigo_modalidade=None, on_checkpoint=None):
+    def get_all_editais(self, data_inicial=None, data_final=None, codigo_modalidade=None, on_checkpoint=None, max_workers=5):
         """
-        Busca todos os editais com checkpoint periódico.
+        Busca todos os editais com paralelização e checkpoint periódico.
         
         Args:
             data_inicial: Data inicial (formato YYYYMMDD)
             data_final: Data final (formato YYYYMMDD)
             codigo_modalidade: Código da modalidade (ex.: 6 para Pregão Eletrônico)
             on_checkpoint: Callback opcional (editais_list, current_page) para salvar progresso
+            max_workers: Número de threads paralelas (padrão: 5)
         """
         from backend.config import PAGE_SIZE
         
-        # Get starting page from checkpoint (go back 1 page for safety)
+        # Primeira requisição para descobrir o total de páginas
+        logger.info("Fetching first page to determine total pages...")
+        first_result = self.get_editais(page=1, data_inicial=data_inicial, data_final=data_final, codigo_modalidade=codigo_modalidade)
+        
+        if first_result is None:
+            logger.error("Failed to fetch first page")
+            return []
+        
+        total_pages = first_result.get("totalPaginas", 1)
+        total_records = first_result.get("totalRegistros", 0)
+        first_page_data = first_result.get("data", first_result.get("contratacoes", []))
+        
+        logger.info(f"Total pages: {total_pages}, Total records: {total_records}")
+        
+        if total_pages <= 1:
+            return first_page_data if isinstance(first_page_data, list) else []
+        
+        # Inicializa com dados da primeira página
+        all_editais = list(first_page_data) if isinstance(first_page_data, list) else []
+        
+        # Get starting page from checkpoint
         last_checkpoint_page = self._get_last_checkpoint_page()
-        start_page = max(1, last_checkpoint_page - 1) if last_checkpoint_page > 1 else 1
+        start_page = max(2, last_checkpoint_page) if last_checkpoint_page > 1 else 2
         
-        if start_page < last_checkpoint_page:
-            logger.info(f"Resuming from page {start_page} (checkpoint was at page {last_checkpoint_page}, going back 1 page for safety)")
+        if start_page > 2:
+            logger.info(f"Resuming from page {start_page} (checkpoint was at page {last_checkpoint_page})")
         
-        all_editais = []
-        page = start_page
-        errors_count = 0
-        max_errors = 3
-        checkpoint_interval = 10  # Save checkpoint every 10 pages
-        pages_since_checkpoint = 0
-        
-        while True:
-            logger.info(f"Fetching editais page {page}...")
-            result = self.get_editais(page=page, data_inicial=data_inicial, data_final=data_final, codigo_modalidade=codigo_modalidade)
-            
+        # Define função para buscar uma página
+        def fetch_page(page_num):
+            if is_cancelled():
+                return page_num, []
+            result = self.get_editais(page=page_num, data_inicial=data_inicial, data_final=data_final, codigo_modalidade=codigo_modalidade)
             if result is None:
-                errors_count += 1
-                logger.warning(f"Failed to fetch page {page}. Error count: {errors_count}/{max_errors}")
-                if errors_count >= max_errors:
-                    logger.error(f"Too many consecutive errors, stopping at page {page}")
-                    break
-                page += 1
-                time.sleep(1)
-                continue
-            
-            errors_count = 0
-            
+                return page_num, []
             if isinstance(result, list):
-                data = result
+                return page_num, result
             elif isinstance(result, dict):
                 data = result.get("data", result.get("contratacoes", []))
-                if not isinstance(data, list):
-                    logger.warning(f"Unexpected data format on page {page}: {type(data)}")
-                    data = []
-            else:
-                logger.warning(f"Unexpected result type on page {page}: {type(result)}")
-                break
+                return page_num, data if isinstance(data, list) else []
+            return page_num, []
+        
+        # Busca páginas em paralelo em batches
+        remaining_pages = list(range(start_page, total_pages + 1))
+        batch_size = max_workers * 2  # Processa em batches maiores para manter threads ocupadas
+        checkpoint_interval = 50  # Salva checkpoint a cada 50 páginas
+        pages_fetched = 0
+        cancelled = False
+        
+        logger.info(f"Fetching {len(remaining_pages)} remaining pages with {max_workers} parallel workers...")
+        logger.info("Press Ctrl+C to interrupt...")
+        
+        try:
+            reset_cancel()  # Garante que a flag está limpa no início
             
-            if not data:
-                logger.info(f"No more data on page {page}, stopping pagination")
-                break
-
-            prev_total = len(all_editais)
-            all_editais.extend(data)
-            fetched_now = len(all_editais) - prev_total
-            logger.info(f"Fetched {len(data)} editais from page {page}. Total: {len(all_editais)}")
-            
-            pages_since_checkpoint += 1
-            
-            # Save checkpoint every N pages
-            if pages_since_checkpoint >= checkpoint_interval:
-                logger.info(f"Checkpoint: {len(all_editais)} editais fetched on page {page}, saving...")
-                self._save_checkpoint_page(page)
+            while remaining_pages and not is_cancelled():
+                batch = remaining_pages[:batch_size]
+                remaining_pages = remaining_pages[batch_size:]
+                
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(fetch_page, page): page for page in batch}
+                    
+                    try:
+                        for future in as_completed(futures, timeout=60):
+                            if is_cancelled():
+                                break
+                            page_num = futures[future]
+                            try:
+                                _, page_data = future.result(timeout=5)
+                                if page_data:
+                                    all_editais.extend(page_data)
+                                pages_fetched += 1
+                                
+                                if pages_fetched % 10 == 0:
+                                    logger.info(f"Progress: {pages_fetched + 1}/{total_pages} pages, {len(all_editais)} editais collected")
+                            except Exception as e:
+                                logger.error(f"Error fetching page {page_num}: {e}")
+                    except KeyboardInterrupt:
+                        logger.warning("\nInterrupção solicitada! Cancelando operações...")
+                        request_cancel()
+                        # Cancela futures pendentes
+                        for future in futures:
+                            future.cancel()
+                        cancelled = True
+                        break
+                
+                if cancelled or is_cancelled():
+                    break
+                
+                # Checkpoint após cada batch
+                if pages_fetched % checkpoint_interval == 0 or not remaining_pages:
+                    current_page = batch[-1] if batch else start_page
+                    self._save_checkpoint_page(current_page)
+                    if on_checkpoint:
+                        try:
+                            on_checkpoint(all_editais, current_page)
+                        except Exception as e:
+                            logger.error(f"Error in checkpoint callback: {e}")
+                
+                # Pequena pausa entre batches para não sobrecarregar a API
+                if remaining_pages:
+                    time.sleep(0.2)
+                    
+        except KeyboardInterrupt:
+            logger.warning("\nInterrupção solicitada (Ctrl+C)! Salvando progresso...")
+            request_cancel()
+            cancelled = True
+        
+        if cancelled:
+            logger.info(f"Operação interrompida. Salvando {len(all_editais)} editais coletados até agora...")
+            # Salva checkpoint final
+            if all_editais:
+                self._save_checkpoint_page(pages_fetched + start_page)
                 if on_checkpoint:
                     try:
-                        on_checkpoint(all_editais, page)
+                        on_checkpoint(all_editais, pages_fetched + start_page)
                     except Exception as e:
-                        logger.error(f"Error in checkpoint callback: {e}")
-                pages_since_checkpoint = 0
-
-            if fetched_now < PAGE_SIZE:
-                logger.info(f"Fetched fewer than PAGE_SIZE ({fetched_now} < {PAGE_SIZE}) on page {page}, stopping pagination")
-                break
-
-            page += 1
-            time.sleep(0.5)
+                        logger.error(f"Error in final checkpoint callback: {e}")
         
         logger.info(f"Finished fetching editais. Total collected: {len(all_editais)}")
         return all_editais

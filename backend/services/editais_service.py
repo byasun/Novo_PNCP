@@ -5,6 +5,7 @@ from backend.api_client.pncp_client import PNCPClient
 from backend.storage.data_manager import DataManager
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,17 @@ class EditaisService:
         self.client = PNCPClient()
         self.data_manager = DataManager()
     
-    def fetch_all_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6):
-        # Busca editais com checkpoint incremental
+    def fetch_all_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6, filter_by_publication_date=True, days_publication=15):
+        """
+        Busca editais com checkpoint incremental e filtro opcional de data de publicação.
+        
+        Args:
+            data_inicial: Data inicial para busca na API (não é usado para filtro final)
+            data_final: Data final para busca na API (não é usado para filtro final)
+            codigo_modalidade: Código da modalidade
+            filter_by_publication_date: Se True, filtra por dataPublicacaoPncp dos últimos N dias
+            days_publication: Número de dias para filtro de publicação (padrão: 15)
+        """
         logger.info(f"Starting editais fetch with codigo_modalidade: {codigo_modalidade}...")
         
         # Callback para salvar checkpoint periódico
@@ -30,6 +40,13 @@ class EditaisService:
             on_checkpoint=save_editais_checkpoint
         )
         logger.info(f"Fetched {len(editais)} editais from API")
+        
+        # Aplica filtro de data de publicação se solicitado
+        if filter_by_publication_date:
+            logger.info(f"Applying publication date filter (last {days_publication} days)...")
+            editais = self._filter_editais_by_publication_date(editais, days=days_publication)
+            logger.info(f"After publication date filter: {len(editais)} editais remaining")
+        
         return editais
     
     def fetch_itens_for_edital(self, cnpj, ano, numero):
@@ -60,6 +77,111 @@ class EditaisService:
                     continue
         return None
     
+    def _parse_date_field(self, date_str):
+        """
+        Parse data em vários formatos para timestamp.
+        Suporta: ISO (2026-02-05), ISO com tempo, timestamp Unix, etc.
+        """
+        if not date_str:
+            return None
+        
+        try:
+            # Se for número, trata como timestamp
+            if isinstance(date_str, (int, float)):
+                return datetime.fromtimestamp(date_str)
+            
+            # Converte string para datetime
+            date_str = str(date_str).strip()
+            
+            # Remove 'Z' de final se presente
+            if date_str.endswith('Z'):
+                date_str = date_str[:-1]
+            
+            # Tenta ISO format com tempo
+            if 'T' in date_str:
+                return datetime.fromisoformat(date_str)
+            
+            # Tenta ISO format já data
+            if len(date_str) == 10 and date_str.count('-') == 2:
+                return datetime.fromisoformat(date_str)
+            
+            # Tenta outros formatos comuns
+            for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d']:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except:
+                    pass
+        
+        except Exception as e:
+            logger.debug(f"Could not parse date '{date_str}': {e}")
+        
+        return None
+    
+    def _filter_editais_by_publication_date(self, editais, days=15):
+        """
+        Filtra editais mantendo apenas os publicados nos últimos N dias.
+        
+        Procura pelos campos:
+        - dataPublicacaoPncp (prioritário)
+        - dataPublicacao
+        - dataInclusao
+        
+        Args:
+            editais (list): Lista de editais da API
+            days (int): Número de dias para retrospecção
+        
+        Returns:
+            list: Editais filtrados por data de publicação
+        """
+        if not editais:
+            return []
+        
+        cutoff_date = datetime.now() - timedelta(days=days)
+        filtered = []
+        rejected = []
+        
+        for edital in editais:
+            # Tenta encontrar a data de publicação em ordem de preferência
+            pub_date_str = None
+            for field in ['dataPublicacaoPncp', 'dataPublicacao', 'dataInclusao']:
+                pub_date_str = edital.get(field)
+                if pub_date_str:
+                    break
+            
+            if not pub_date_str:
+                logger.debug(f"Could not find publication date for edital {edital.get('numeroCompra')}, keeping it (no date = recent)")
+                filtered.append(edital)
+                continue
+            
+            # Converte string de data para datetime
+            pub_date = self._parse_date_field(pub_date_str)
+            
+            if not pub_date:
+                logger.debug(f"Could not parse publication date '{pub_date_str}' for edital {edital.get('numeroCompra')}, keeping it")
+                filtered.append(edital)
+                continue
+            
+            # Verifica se está dentro da janela de tempo
+            if pub_date >= cutoff_date:
+                filtered.append(edital)
+            else:
+                rejected.append({
+                    'numero': edital.get('numeroCompra'),
+                    'pub_date': pub_date.strftime('%Y-%m-%d'),
+                    'type': 'old_publication'
+                })
+        
+        # Log de resumo
+        logger.info(f"Filtered editais by publication date (last {days} days):")
+        logger.info(f"  - Kept: {len(filtered)} editais")
+        logger.info(f"  - Rejected (too old): {len(rejected)} editais")
+        
+        if rejected and len(rejected) <= 10:
+            for item in rejected[:10]:
+                logger.debug(f"    Rejected: {item['numero']} (published: {item['pub_date']})")
+        
+        return filtered
+
     def fetch_itens_for_all_editais(self, editais):
         """
         Busca itens de todos os editais com threads e salvamento incremental.
@@ -282,7 +404,7 @@ class EditaisService:
             logger.warning("No editais were fetched from API")
         return editais
 
-    def sync_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6):
+    def sync_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6, filter_by_publication_date=False, days_publication=15):
         """
         Sincronização incremental: compara editais remotos e locais.
 
@@ -290,11 +412,21 @@ class EditaisService:
         - Adiciona novos editais
         - Busca itens apenas para editais novos
         
+        Args:
+            filter_by_publication_date: Se True, filtra por dataPublicacaoPncp após buscar da API
+            days_publication: Número de dias para filtro de publicação
+        
         Retorna: {added: int, updated: int}
         """
         logger.info(f"Starting incremental sync for editais ({data_inicial} to {data_final})")
         # Busca editais remotos (com checkpoint)
-        remote_editais = self.fetch_all_editais(data_inicial, data_final, codigo_modalidade)
+        remote_editais = self.fetch_all_editais(
+            data_inicial, 
+            data_final, 
+            codigo_modalidade,
+            filter_by_publication_date=filter_by_publication_date,
+            days_publication=days_publication
+        )
         if not remote_editais:
             logger.info("No remote editais fetched for incremental sync")
             return {"added": 0, "updated": 0}
