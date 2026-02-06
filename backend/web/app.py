@@ -185,10 +185,18 @@ def api_status():
     editais = editais_service.get_all_editais_local()
     last_update = data_manager.get_last_update()
     
+    user_info = {}
+    if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
+        user_info = {
+            "name": getattr(current_user, 'name', None),
+            "username": getattr(current_user, 'username', None),
+            "email": getattr(current_user, 'email', None),
+        }
     status = {
         "total_editais": len(editais),
         "last_update": datetime.fromtimestamp(last_update).isoformat() if last_update else None,
-        "scheduler": daily_job.get_status() if daily_job else None
+        "scheduler": daily_job.get_status() if daily_job else None,
+        **user_info
     }
     return jsonify(status)
 

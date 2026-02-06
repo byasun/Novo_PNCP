@@ -1,3 +1,21 @@
+// Formata CNPJ para XX.XXX.XXX/XXXX-XX
+const formatCNPJ = (cnpj) => {
+  if (!cnpj) return '—';
+  const digits = String(cnpj).replace(/\D/g, '');
+  if (digits.length !== 14) return cnpj;
+  return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12,14)}`;
+}
+// Formata datas para DD/MM/YYYY
+const formatDateBR = (dateString) => {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   BrowserRouter,
@@ -131,7 +149,7 @@ const AuthProvider = ({ children }) => {
 }
 
 const Layout = ({ children }) => {
-  const { authStatus, logout, message, setMessage } = useAuth()
+  const { authStatus, logout, message, setMessage, statusInfo } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -155,8 +173,9 @@ const Layout = ({ children }) => {
         </div>
         {authStatus === 'authenticated' && (
           <div className="nav">
-            <Link to="/editais">Editais</Link>
-            <Link to="/users/new">Novo usuário</Link>
+            <span>
+              {statusInfo?.name || statusInfo?.username || 'Usuário'}
+            </span>
             <button className="btn btn--ghost" onClick={handleLogout}>
               Sair
             </button>
@@ -247,7 +266,6 @@ const LoginPage = () => {
     </div>
   )
 }
-
 
 const CreateUserPage = () => {
   const { createUser, setMessage } = useAuth()
@@ -383,13 +401,27 @@ const EditaisPage = () => {
     })
   }, [editais, search])
 
+  // Helper to format date string
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div className="stack">
       <div className="card card--inline">
         <div>
           <h2>Status</h2>
           <p>Total de editais: {statusInfo?.total_editais ?? editais.length}</p>
-          <p>Última atualização: {statusInfo?.last_update ?? '—'}</p>
+          <p>Última atualização: {formatDateTime(statusInfo?.last_update)}</p>
         </div>
         <div className="actions">
           <button className="btn" onClick={handleTriggerUpdate} disabled={loading}>
@@ -419,7 +451,6 @@ const EditaisPage = () => {
         </div>
         <div className="table">
           <div className="table__head">
-            <span>Processo</span>
             <span>CNPJ</span>
             <span>Razão social</span>
             <span>Objeto</span>
@@ -428,14 +459,12 @@ const EditaisPage = () => {
           {filteredEditais.map((edital, index) => {
             const chave = getEditalKey(edital)
             const objeto = getEditalObjeto(edital)
-            const cnpj = getEditalCnpj(edital)
+            const cnpj = formatCNPJ(getEditalCnpj(edital))
             const razaoSocial = getEditalRazaoSocial(edital)
-            const processo = edital?.processo || ''
             const valorEstimado = edital?.valorTotalEstimado
             const key = chave || edital.id || edital.numero || index
             const content = (
               <>
-                <span>{processo || '—'}</span>
                 <span>{cnpj || '—'}</span>
                 <span>{razaoSocial || '—'}</span>
                 <span>{objeto || '—'}</span>
@@ -498,32 +527,56 @@ const EditalDetailPage = () => {
           </Link>
         </div>
         {loading && <p>Carregando detalhes...</p>}
-        {!loading && edital && (
-          <div className="detail-grid">
-            {Object.entries(edital).map(([key, value]) => (
-              <div key={key} className="detail-item">
-                <span className="detail-label">{key}</span>
-                <span className="detail-value">{String(value)}</span>
+          {!loading && edital && (
+            <div className="detail-grid">
+              <div className="detail-item">
+                <span className="detail-label">CNPJ</span>
+                <span className="detail-value">{formatCNPJ(edital?.orgaoEntidade?.cnpj || edital?.cnpjOrgao)}</span>
               </div>
-            ))}
-          </div>
-        )}
+              <div className="detail-item">
+                <span className="detail-label">Razão Social</span>
+                <span className="detail-value">{edital?.orgaoEntidade?.razaoSocial || '—'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Data Abertura Proposta</span>
+                <span className="detail-value">{formatDateBR(edital?.dataAberturaProposta)}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Data Encerramento Proposta</span>
+                <span className="detail-value">{formatDateBR(edital?.dataEncerramentoProposta)}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Objeto da Compra</span>
+                <span className="detail-value">{edital?.objetoCompra || edital?.objeto || '—'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Informação Complementar</span>
+                <span className="detail-value">{edital?.informacaoComplementar || '—'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Valor Total Estimado</span>
+                <span className="detail-value">{formatCurrencyBRL(edital?.valorTotalEstimado)}</span>
+              </div>
+            </div>
+          )}
       </div>
 
       <div className="card">
         <h2>Itens</h2>
         <p>Total de itens: {itens.length}</p>
-        <div className="table">
-          <div className="table__head">
-            <span>Descrição</span>
-            <span>Quantidade</span>
-            <span>Unidade</span>
+        <div className="table table--fullwidth">
+          <div className="table__head" style={{ display: 'flex', width: '100%' }}>
+            <span style={{ flex: 1, textAlign: 'left' }}>Descrição</span>
+            <span style={{ flex: 1, textAlign: 'center' }}>Quantidade</span>
+            <span style={{ flex: 1, textAlign: 'left' }}>Valor Unitário Estimado</span>
+            <span style={{ flex: 1, textAlign: 'center' }}>Unidade</span>
           </div>
           {itens.map((item, index) => (
-            <div className="table__row" key={item.id || item.numero || index}>
-              <span>{item.descricao || item.item || '—'}</span>
-              <span>{item.quantidade || item.qtd || '—'}</span>
-              <span>{item.unidade || item.un || '—'}</span>
+            <div className="table__row" key={item.id || item.numero || index} style={{ display: 'flex', width: '100%' }}>
+              <span style={{ flex: 1, textAlign: 'left' }}>{item.descricao || item.item || '—'}</span>
+              <span style={{ flex: 1, textAlign: 'center' }}>{item.quantidade || item.qtd || '—'}</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>{typeof item.valorUnitarioEstimado !== 'undefined' ? formatCurrencyBRL(item.valorUnitarioEstimado) : '—'}</span>
+              <span style={{ flex: 1, textAlign: 'center' }}>{item.unidade || item.un || '—'}</span>
             </div>
           ))}
         </div>
