@@ -6,7 +6,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from backend.config import (
     API_BASE_URL, API_ITEMS_BASE_URL, PAGE_SIZE, MAX_RETRIES, RETRY_DELAY, 
-    EDITAIS_CHECKPOINT_FILE, request_cancel, reset_cancel, is_cancelled
+    RETRY_BACKOFF_MULTIPLIER, EDITAIS_CHECKPOINT_FILE, request_cancel, reset_cancel, is_cancelled
 )
 
 logger = logging.getLogger(__name__)
@@ -48,18 +48,57 @@ class PNCPClient:
         except Exception as e:
             logger.error(f"Error saving checkpoint file: {e}")
     
+    def _calculate_backoff_delay(self, attempt, base_delay=None):
+        """Calcula delay com backoff exponencial para retries."""
+        if base_delay is None:
+            base_delay = RETRY_DELAY
+        return base_delay * (RETRY_BACKOFF_MULTIPLIER ** attempt)
+    
+    def _handle_rate_limit(self, response, attempt):
+        """
+        Trata erro 429 (Too Many Requests) com backoff inteligente.
+        Respeita o header Retry-After se presente.
+        """
+        # Tenta obter o tempo de espera do header Retry-After
+        retry_after = response.headers.get('Retry-After')
+        if retry_after:
+            try:
+                wait_time = int(retry_after)
+                logger.warning(f"Rate limited (429). Server requested wait: {wait_time}s")
+                return wait_time
+            except ValueError:
+                pass
+        
+        # Se não tiver Retry-After, usa backoff exponencial mais agressivo
+        wait_time = self._calculate_backoff_delay(attempt, base_delay=RETRY_DELAY * 2)
+        logger.warning(f"Rate limited (429). Using exponential backoff: {wait_time:.1f}s")
+        return wait_time
+    
     def _make_request(self, endpoint, params=None):
-        # Requisição GET com retry e timeout padrão
+        # Requisição GET com retry, backoff exponencial e tratamento de rate limit
         url = f"{self.base_url}{endpoint}"
         for attempt in range(MAX_RETRIES):
             try:
                 response = self.session.get(url, params=params, timeout=30)
+                
+                # Tratamento específico para rate limiting (429)
+                if response.status_code == 429:
+                    if attempt < MAX_RETRIES - 1:
+                        wait_time = self._handle_rate_limit(response, attempt)
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"Rate limit exceeded after {MAX_RETRIES} attempts for {url}")
+                        raise requests.exceptions.HTTPError(f"429 Too Many Requests: {url}")
+                
                 response.raise_for_status()
                 return response.json()
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Attempt {attempt + 1}/{MAX_RETRIES} failed for {url}: {e}")
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                    wait_time = self._calculate_backoff_delay(attempt)
+                    logger.info(f"Retrying in {wait_time:.1f}s...")
+                    time.sleep(wait_time)
                 else:
                     logger.error(f"All retries failed for {url}")
                     raise
@@ -123,13 +162,25 @@ class PNCPClient:
                 if response.status_code == 404:
                     logger.debug(f"Items count endpoint not found for {cnpj}/{ano}/{mes} (404)")
                     return 0
+                
+                # Tratamento de rate limiting (429)
+                if response.status_code == 429:
+                    if attempt < MAX_RETRIES - 1:
+                        wait_time = self._handle_rate_limit(response, attempt)
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"Rate limit exceeded for {url}")
+                        return 0
+                
                 response.raise_for_status()
                 # Response body is a plain number
                 return int(response.json()) if response.text else 0
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Attempt {attempt+1}/{MAX_RETRIES} failed for {url}: {e}")
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                    wait_time = self._calculate_backoff_delay(attempt)
+                    time.sleep(wait_time)
                 else:
                     logger.error(f"All retries failed for {url}")
                     return 0
@@ -148,6 +199,16 @@ class PNCPClient:
                     logger.debug(f"Items endpoint not found for {cnpj}/{ano}/{mes} (404)")
                     return []
                 
+                # Tratamento de rate limiting (429)
+                if response.status_code == 429:
+                    if attempt < MAX_RETRIES - 1:
+                        wait_time = self._handle_rate_limit(response, attempt)
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"Rate limit exceeded for {url}")
+                        return []
+                
                 response.raise_for_status()
                 result = response.json()
                 
@@ -164,7 +225,8 @@ class PNCPClient:
                 # For non-404 errors, log and retry
                 logger.warning(f"Attempt {attempt+1}/{MAX_RETRIES} failed for {url}: {e}")
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                    wait_time = self._calculate_backoff_delay(attempt)
+                    time.sleep(wait_time)
                     continue
                 logger.error(f"All retries failed for {url}")
                 return []

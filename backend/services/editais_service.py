@@ -182,15 +182,24 @@ class EditaisService:
         
         return filtered
 
-    def fetch_itens_for_all_editais(self, editais):
+    def fetch_itens_for_all_editais(self, editais, skip_existing=None):
         """
         Busca itens de todos os editais com threads e salvamento incremental.
         
         - Usa endpoints paginados quando possível
         - Anota cada item com chaves do edital
         - Salva checkpoints para permitir retomada
+        
+        Args:
+            editais: Lista de editais para buscar itens
+            skip_existing: Se True, pula editais que já têm itens salvos.
+                          Se None, usa valor de ITEMS_SKIP_EXISTING do .env (padrão: True)
         """
-        from backend.config import ITEMS_FETCH_THREADS, ITEMS_FETCH_DELAY_PER_THREAD, ITEMS_FETCH_CHECKPOINT
+        from backend.config import ITEMS_FETCH_THREADS, ITEMS_FETCH_DELAY_PER_THREAD, ITEMS_FETCH_CHECKPOINT, ITEMS_SKIP_EXISTING
+        
+        # Usa configuração do .env se não especificado
+        if skip_existing is None:
+            skip_existing = ITEMS_SKIP_EXISTING
         
         if not editais:
             logger.info("No editais provided for item fetching")
@@ -199,12 +208,42 @@ class EditaisService:
         # Carrega itens existentes para evitar duplicidades
         existing_itens = self.data_manager.load_itens()
         existing_keys = set()
+        existing_edital_keys = set()  # Chaves de editais que já têm itens
+        
         for item in existing_itens:
-            # Cria chave única para deduplicação
+            # Cria chave única para deduplicação de itens
             key = f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
             existing_keys.add(key)
+            # Cria chave do edital para verificar quais já foram processados
+            edital_key = f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
+            existing_edital_keys.add(edital_key)
         
         logger.info(f"Loaded {len(existing_itens)} existing items from storage")
+        logger.info(f"Found {len(existing_edital_keys)} editais with items already saved")
+        
+        # Filtra editais que já têm itens salvos (se skip_existing=True)
+        if skip_existing and existing_edital_keys:
+            editais_to_process = []
+            skipped_count = 0
+            for edital in editais:
+                cnpj = (edital.get("orgaoEntidade", {}) or {}).get("cnpj") or edital.get("cnpjOrgao")
+                ano = edital.get("anoCompra") or edital.get("ano")
+                numero = edital.get("numeroCompra") or edital.get("numero")
+                edital_key = f"{cnpj}_{ano}_{numero}"
+                
+                if edital_key in existing_edital_keys:
+                    skipped_count += 1
+                else:
+                    editais_to_process.append(edital)
+            
+            logger.info(f"Skipping {skipped_count} editais that already have items saved")
+            logger.info(f"Will process {len(editais_to_process)} editais without items")
+            editais = editais_to_process
+            
+            if not editais:
+                logger.info("All editais already have items saved. Nothing to fetch.")
+                return existing_itens
+        
         logger.info(f"Fetching items for {len(editais)} editais using {ITEMS_FETCH_THREADS} parallel threads...")
         
         all_itens = existing_itens.copy()  # Start with existing items
