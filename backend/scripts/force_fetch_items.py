@@ -2,12 +2,14 @@
 import logging
 import os
 import sys
+import signal
 from datetime import datetime
 
-# Adiciona a pasta raiz ao PATH para permitir imports do projeto
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Adiciona a pasta raiz (Novo_PNCP) ao PATH para permitir imports do projeto
+# __file__ = scripts/force_fetch_items.py -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR
+from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR, request_cancel
 
 if not os.path.exists(LOGS_DIR):
     # Garante a pasta de logs
@@ -75,6 +77,16 @@ def main():
     return 0
 
 
+def signal_handler(signum, frame):
+    """Handler para Ctrl+C - sinaliza cancelamento e sai graciosamente."""
+    print("\n\n⚠️  Interrupção solicitada (Ctrl+C). Finalizando...")
+    request_cancel()
+    sys.exit(0)
+
+
 if __name__ == "__main__":
+    # Registra handler para Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+    
     exit_code = main()
     sys.exit(exit_code)

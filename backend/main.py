@@ -1,8 +1,11 @@
 """Ponto de entrada da aplicação PNCP (editais)."""
 
+import atexit
 import logging
 import os
+import signal
 import sys
+import uuid
 
 # Permite executar como script dentro de backend/ (python main.py)
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,11 +33,43 @@ from backend.scheduler.job import DailyJob
 from backend.web.app import app, set_job
 from backend.storage.data_manager import DataManager
 
+
+def _invalidate_all_sessions():
+    """Invalida todas as sessões ativas ao encerrar o sistema.
+    
+    Isso é feito alterando a SECRET_KEY, o que torna todos os cookies
+    de sessão existentes inválidos quando o servidor reiniciar.
+    """
+    logger.info("Invalidating all active sessions (server shutdown)...")
+    # Gera nova SECRET_KEY para invalidar sessões existentes
+    app.config["SECRET_KEY"] = str(uuid.uuid4())
+    logger.info("All sessions invalidated.")
+
+
+def _shutdown_handler(signum, frame):
+    """Handler para sinais de encerramento (SIGINT, SIGTERM)."""
+    logger.info("=" * 60)
+    logger.info("Received shutdown signal. Cleaning up...")
+    logger.info("=" * 60)
+    _invalidate_all_sessions()
+    sys.exit(0)
+
+
 def main():
+    # Registra handlers de encerramento
+    signal.signal(signal.SIGINT, _shutdown_handler)
+    signal.signal(signal.SIGTERM, _shutdown_handler)
+    atexit.register(_invalidate_all_sessions)
+    
     # Log de inicialização
     logger.info("=" * 60)
     logger.info("Starting PNCP Editais System")
     logger.info("=" * 60)
+    
+    # Gera SECRET_KEY única para esta instância (invalida sessões anteriores)
+    runtime_secret = f"{app.config['SECRET_KEY']}_{uuid.uuid4()}"
+    app.config["SECRET_KEY"] = runtime_secret
+    logger.info("New session secret generated (previous sessions invalidated)")
     
     data_manager = DataManager()
     # Carrega editais locais (se existirem)
