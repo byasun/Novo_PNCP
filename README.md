@@ -31,10 +31,10 @@ Este projeto implementa um **sistema completo de gerenciamento de editais** com:
 - Retorna status de início ou já em progresso
 
 ### 3. **Sistema de Checkpoint**
-- Salva progresso a cada 10 páginas
-- Resume seguramente de checkpoint-1 em caso de interrupção
-- Arquivo: `backend/data/.editais_checkpoint.json`
-- Zero perda de dados em Ctrl+C
+* Salva progresso a cada 100 editais (ou 10 páginas, conforme configuração)
+* Retoma seguramente de checkpoint-1 em caso de interrupção
+* Arquivo: `backend/data/.editais_checkpoint.json`
+* Zero perda de dados em Ctrl+C
 
 ### 4. **Busca e Filtro**
 - Interface web em `http://localhost:5173`
@@ -50,10 +50,13 @@ Este projeto implementa um **sistema completo de gerenciamento de editais** com:
 - Sanitização de caracteres especiais para Excel
 
 ### 6. **Login e Área de Usuários**
-- Primeiro acesso direciona para `/setup` para criar o usuário inicial
-- Acesso às informações somente após login
-- Sessão com CSRF e tempo configurável
-- Usuários armazenados em SQLite (`backend/data/users.db`)
+* Criação do primeiro usuário agora é feita via script:
+  ```bash
+  python backend/scripts/create_user.py "Admin" admin admin@email.com SenhaForte123!
+  ```
+* Acesso às informações somente após login
+* Sessão com CSRF e tempo configurável
+* Usuários armazenados em SQLite (`backend/data/users.db`)
 
 ---
 
@@ -66,7 +69,7 @@ Novo_PNCP/
 │   ├── config/                 # Configurações centralizadas
 │   ├── export/                 # Exportação de dados
 │   ├── scheduler/              # Agendamento de tarefas
-│   ├── scripts/                # Scripts utilitários
+│   ├── scripts/                # Scripts utilitários (criação de usuário, limpeza, admin, fetch manual)
 │   ├── services/               # Lógica de negócio
 │   ├── storage/                # Persistência e autenticação
 │   ├── tests/                  # Testes de backend
@@ -173,18 +176,18 @@ POST /api/trigger-update
 
 ### Sistema de Checkpoint
 ```
-Primeira Execução:
-  Page 1-10: Fetch ✓ → Checkpoint save
-  Page 11-20: Fetch ✓ → Checkpoint save
-  Page 21: Fetch ✓ → Interrupção (Ctrl+C)
-  └─ Arquivo: {"last_checkpoint_page": 20}
+Exemplo de Execução:
+  Editais 1-100: Fetch ✓ → Checkpoint save
+  Editais 101-200: Fetch ✓ → Checkpoint save
+  Editais 201: Fetch ✓ → Interrupção (Ctrl+C)
+  └─ Arquivo: {"last_checkpoint_page": 200}
 
 Retomada:
-  Lê checkpoint: page = 20
-  Calcula: start = max(1, 20-1) = 19
-  Page 19-20: Refetch (segurança)
-  Page 21+: Fetch novo
-  └─ Novo checkpoint: {"last_checkpoint_page": 30}
+  Lê checkpoint: page = 200
+  Calcula: start = max(1, 200-1) = 199
+  Editais 199-200: Refetch (segurança)
+  Editais 201+: Fetch novo
+  └─ Novo checkpoint: {"last_checkpoint_page": 300}
 ```
 
 ---
@@ -201,7 +204,7 @@ POST /api/trigger-update             # Dispara atualização
 
 POST /login                          # Login
 POST /logout                         # Logout
-POST /setup                          # Criar primeiro usuário
+POST /setup                          # (Removido do frontend, criar usuário via script)
 POST /users/new                      # Criar novo usuário
 GET  /download/<filename>            # Download CSV/XLSX
 ```
@@ -346,10 +349,10 @@ INFO: Interrupted: saved 45000 items collected so far
 - Otimizado para performance
 
 ### Parallel Item Fetching
-- 5 threads paralelas
-- 0.1s delay por thread
-- Checkpoint a cada 100 editais
-- Deduplicação automática
+* 5 threads paralelas (ajustável)
+* 0.1s delay por thread (ajustável)
+* Checkpoint a cada 100 editais (padrão, configurável)
+* Deduplicação automática
 
 ---
 
@@ -392,6 +395,21 @@ INFO: Interrupted: saved 45000 items collected so far
 
 ---
 
-**Última Atualização**: 05 de Fevereiro de 2026
+---
 
-**Versão**: 3.0 (Separação entre frontend e backend + migração do frontend para React (Vite))
+## 🆕 Mudanças e Melhorias Recentes
+
+- Separação total entre frontend (React/Vite) e backend (Python/Flask)
+- Migração do frontend para React (Vite) com SPA moderna
+- Criação do usuário inicial agora via script utilitário (não mais pelo frontend)
+- Scripts utilitários para limpeza de dados, promoção de admin, fetch manual, visualização de usuários
+- Sistema de checkpoint aprimorado (agora padrão 100 editais, mais seguro e robusto)
+- Ajustes de autenticação, CSRF e política de sessão
+- Logs mais detalhados e estruturados
+- Documentação dos endpoints e exemplos de uso dos scripts
+- Melhorias de performance e robustez no fetch paralelo e exportação
+- Ajustes de troubleshooting e mensagens de erro mais claras
+
+**Última Atualização**: 06 de Fevereiro de 2026
+
+**Versão**: 3.0.1 (Aprimoramentos, scripts CLI, documentação revisada)
