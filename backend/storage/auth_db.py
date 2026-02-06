@@ -20,9 +20,12 @@ class User(Base, UserMixin):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)  # Nome completo
     username = Column(String(150), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)  # Perfil admin (definido via banco de dados)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def set_password(self, password: str) -> None:
@@ -86,10 +89,16 @@ def get_user_by_username(username: str) -> Optional[User]:
         return session.query(User).filter(User.username == username).first()
 
 
-def create_user(username: str, password: str) -> User:
+def get_user_by_email(email: str) -> Optional[User]:
+    # Busca usuário por email
+    with get_session() as session:
+        return session.query(User).filter(User.email == email).first()
+
+
+def create_user(username: str, password: str, name: str = "", email: str = "") -> User:
     # Cria usuário com senha hasheada
     with get_session() as session:
-        user = User(username=username)
+        user = User(username=username, name=name, email=email)
         user.set_password(password)
         session.add(user)
         session.flush()

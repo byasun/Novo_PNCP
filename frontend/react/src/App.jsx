@@ -108,10 +108,6 @@ const AuthProvider = ({ children }) => {
     setStatusInfo(null)
   }
 
-  const setup = async (payload) => {
-    await fetchJson('/setup', { method: 'POST', body: JSON.stringify(payload) })
-  }
-
   const createUser = async (payload) => {
     await fetchJson('/users/new', { method: 'POST', body: JSON.stringify(payload) })
   }
@@ -126,7 +122,6 @@ const AuthProvider = ({ children }) => {
         refreshStatus,
         login,
         logout,
-        setup,
         createUser,
       }}
     >
@@ -246,77 +241,18 @@ const LoginPage = () => {
           Entrar
         </button>
         <p className="helper">
-          Primeiro acesso? <Link to="/setup">Criar usuário inicial</Link>
+          Não tem conta? <Link to="/users/new">Criar usuário</Link>
         </p>
       </form>
     </div>
   )
 }
 
-const SetupPage = () => {
-  const { setup, setMessage } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ username: '', password: '', confirm: '' })
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setLoading(true)
-    setMessage('')
-    try {
-      await setup(form)
-      setMessage('Usuário criado. Faça login.')
-    } catch (err) {
-      setMessage(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="grid">
-      <form className="card" onSubmit={handleSubmit}>
-        <h2>Primeiro acesso</h2>
-        <label>
-          Usuário
-          <input
-            value={form.username}
-            onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-            placeholder="admin"
-          />
-        </label>
-        <label>
-          Senha
-          <input
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-            placeholder="Mínimo 6 caracteres"
-          />
-        </label>
-        <label>
-          Confirmar senha
-          <input
-            type="password"
-            value={form.confirm}
-            onChange={(event) => setForm((prev) => ({ ...prev, confirm: event.target.value }))}
-            placeholder="Repita a senha"
-          />
-        </label>
-        <button className="btn btn--secondary" type="submit" disabled={loading}>
-          Criar usuário
-        </button>
-        <p className="helper">
-          Já tem usuário? <Link to="/login">Voltar para login</Link>
-        </p>
-      </form>
-    </div>
-  )
-}
 
 const CreateUserPage = () => {
   const { createUser, setMessage } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ username: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', confirm: '' })
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -325,7 +261,7 @@ const CreateUserPage = () => {
     try {
       await createUser(form)
       setMessage('Usuário criado com sucesso.')
-      setForm({ username: '', password: '', confirm: '' })
+      setForm({ name: '', username: '', email: '', password: '', confirm: '' })
     } catch (err) {
       setMessage(err.message)
     } finally {
@@ -338,11 +274,30 @@ const CreateUserPage = () => {
       <form className="card" onSubmit={handleSubmit}>
         <h2>Novo usuário</h2>
         <label>
+          Nome
+          <input
+            value={form.name}
+            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+            placeholder="Nome completo"
+            required
+          />
+        </label>
+        <label>
           Usuário
           <input
             value={form.username}
             onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
             placeholder="novo.usuario"
+            required
+          />
+        </label>
+        <label>
+          Email
+          <input
+            type="email"
+            value={form.email}
+            onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+            placeholder="email@exemplo.com"
             required
           />
         </label>
@@ -369,6 +324,9 @@ const CreateUserPage = () => {
         <button className="btn" type="submit" disabled={loading}>
           Criar usuário
         </button>
+        <p className="helper">
+          Já tem conta? <Link to="/login">Fazer login</Link>
+        </p>
       </form>
     </div>
   )
@@ -592,15 +550,7 @@ function App() {
           <Routes>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/setup" element={<SetupPage />} />
-            <Route
-              path="/users/new"
-              element={
-                <RequireAuth>
-                  <CreateUserPage />
-                </RequireAuth>
-              }
-            />
+            <Route path="/users/new" element={<CreateUserPage />} />
             <Route
               path="/editais"
               element={

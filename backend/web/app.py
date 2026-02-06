@@ -14,6 +14,7 @@ from backend.storage.auth_db import (
     init_db,
     get_user_by_id,
     get_user_by_username,
+    get_user_by_email,
     verify_user,
     create_user,
     has_any_user,
@@ -46,7 +47,6 @@ CORS(
         r"/api/*": {"origins": allowed_origins},
         r"/login": {"origins": allowed_origins},
         r"/logout": {"origins": allowed_origins},
-        r"/setup": {"origins": allowed_origins},
         r"/users/*": {"origins": allowed_origins},
         r"/download/*": {"origins": allowed_origins},
     },
@@ -249,15 +249,18 @@ def login():
         return jsonify({"status": "success", "message": "Already authenticated"})
 
     if not has_any_user():
-        return jsonify({"status": "error", "message": "No users found. Use /setup."}), 409
+        return jsonify({"status": "error", "message": "Nenhum usuário cadastrado. Crie um usuário primeiro."}), 409
 
     data = _get_request_data()
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
     user = verify_user(username, password)
     if user:
+        from flask import session
+        session.permanent = True
         login_user(user, remember=True)
-        return jsonify({"status": "success", "message": "Login successful"})
+        resp = jsonify({"status": "success", "message": "Login successful"})
+        return resp
     return jsonify({"status": "error", "message": "Usuário ou senha inválidos."}), 401
 
 
@@ -269,55 +272,50 @@ def logout():
     return jsonify({"status": "success", "message": "Logged out"})
 
 
-@app.route("/setup", methods=["GET", "POST"])
-@csrf.exempt
-def setup():
-    if request.method == "GET":
-        return _serve_spa()
-
-    if has_any_user():
-        return jsonify({"status": "error", "message": "Setup already completed"}), 409
-
-    data = _get_request_data()
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
-    confirm = data.get("confirm_password") or data.get("confirm") or ""
-
-    if not username or not password:
-        return jsonify({"status": "error", "message": "Preencha usuário e senha."}), 400
-
-    policy_error = validate_password_policy(password, confirm)
-    if policy_error:
-        return jsonify({"status": "error", "message": policy_error}), 400
-    if get_user_by_username(username):
-        return jsonify({"status": "error", "message": "Usuário já existe."}), 409
-
-    create_user(username, password)
-    return jsonify({"status": "success", "message": "Usuário criado."})
+# Rota /setup removida do frontend - criar primeiro usuário via terminal:
+# python scripts/create_user.py "Admin" admin admin@email.com SenhaForte123!
 
 
 @app.route("/users/new", methods=["GET", "POST"])
-@login_required
 @csrf.exempt
 def create_user_view():
     if request.method == "GET":
         return _serve_spa()
 
     data = _get_request_data()
+    name = (data.get("name") or "").strip()
     username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
     confirm = data.get("confirm_password") or data.get("confirm") or ""
 
-    if not username or not password:
-        return jsonify({"status": "error", "message": "Preencha usuário e senha."}), 400
+    # Validações de campos obrigatórios
+    if not name:
+        return jsonify({"status": "error", "message": "Preencha o nome."}), 400
+    if not username:
+        return jsonify({"status": "error", "message": "Preencha o usuário."}), 400
+    if not email:
+        return jsonify({"status": "error", "message": "Preencha o email."}), 400
+    if not password:
+        return jsonify({"status": "error", "message": "Preencha a senha."}), 400
 
+    # Validação de formato de email
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        return jsonify({"status": "error", "message": "Email inválido."}), 400
+
+    # Validação de política de senha
     policy_error = validate_password_policy(password, confirm)
     if policy_error:
         return jsonify({"status": "error", "message": policy_error}), 400
+
+    # Verifica duplicidade de usuário e email
     if get_user_by_username(username):
         return jsonify({"status": "error", "message": "Usuário já existe."}), 409
+    if get_user_by_email(email):
+        return jsonify({"status": "error", "message": "Email já cadastrado."}), 409
 
-    create_user(username, password)
+    create_user(username=username, password=password, name=name, email=email)
     return jsonify({"status": "success", "message": "Usuário criado com sucesso."})
 
 
