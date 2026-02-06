@@ -5,17 +5,23 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const target = env.VITE_API_PROXY_TARGET || ''
 
+  const proxyConfig = {
+    target,
+    changeOrigin: true,
+    secure: false,
+    cookieDomainRewrite: 'localhost',
+  }
+
   return {
     plugins: [react()],
     server: {
       proxy: target
         ? {
-            '/api': target,
-            '/login': target,
-            '/logout': target,
-            '/setup': target,
-            '/users': target,
-            '/download': target,
+            '/api': proxyConfig,
+            '/login': proxyConfig,
+            '/logout': proxyConfig,
+            '/users': proxyConfig,
+            '/download': proxyConfig,
           }
         : undefined,
     },

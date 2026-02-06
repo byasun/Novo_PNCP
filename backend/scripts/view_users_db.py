@@ -27,7 +27,7 @@ def main() -> None:
             return
 
         cursor.execute(
-            "SELECT id, username, is_active, created_at FROM users ORDER BY id;"
+            "SELECT id, name, username, email, is_active, is_admin, created_at FROM users ORDER BY id;"
         )
         rows = cursor.fetchall()
         print("\nUsuários:")
@@ -36,8 +36,15 @@ def main() -> None:
             return
 
         for row in rows:
-            user_id, username, is_active, created_at = row
-            print(f"- id={user_id} | username={username} | active={bool(is_active)} | created_at={created_at}")
+            user_id, name, username, email, is_active, is_admin, created_at = row
+            admin_badge = " [ADMIN]" if is_admin else ""
+            status = "ativo" if is_active else "inativo"
+            print(f"- ID: {user_id}{admin_badge}")
+            print(f"  Nome: {name}")
+            print(f"  Usuário: {username}")
+            print(f"  Email: {email}")
+            print(f"  Status: {status} | Criado em: {created_at}")
+            print()
     finally:
         conn.close()
 

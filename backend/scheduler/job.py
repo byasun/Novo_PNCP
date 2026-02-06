@@ -39,15 +39,20 @@ class DailyJob:
         logger.info("=" * 50)
         
         try:
-            today = datetime.now()
-            data_final = today.strftime("%Y%m%d")
-            data_inicial = (today - timedelta(days=15)).strftime("%Y%m%d")
+            logger.info(f"Daily sync: fetching all editais 'A Receber/Recebendo Proposta' with codigo_modalidade 6 (Pregão - Eletrônico)")
+            logger.info("API will fetch: ALL editais with open proposals period | Client-side filter: only last 15 days by publication date")
             
-            logger.info(f"Daily sync: fetching editais from {data_inicial} to {data_final} with codigo_modalidade 6 (Pregão - Eletrônico)")
+            # IMPORTANT: dataFinal for /contratacoes/proposta endpoint means the MAX date
+            # for proposal reception period, NOT the search date. Use end of 2026
+            # to get ALL editais that are currently open for receiving proposals.
+            data_final = "20261231"  # December 31, 2026 - includes all open editais
+            
             self.editais_service.sync_editais(
-                data_inicial=data_inicial,
-                data_final=data_final,
-                codigo_modalidade=6
+                data_inicial=None,  # No initial date limit - fetch ALL editais
+                data_final=data_final,      # Far future date to include all open proposals
+                codigo_modalidade=6,
+                filter_by_publication_date=True,  # ✅ Client-side filter: last 15 days
+                days_publication=15
             )
             
             self.last_run = datetime.now()

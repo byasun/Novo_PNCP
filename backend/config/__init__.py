@@ -7,9 +7,11 @@ from .settings import (
     PAGE_SIZE,
     MAX_RETRIES,
     RETRY_DELAY,
+    RETRY_BACKOFF_MULTIPLIER,
     ITEMS_FETCH_THREADS,
     ITEMS_FETCH_DELAY_PER_THREAD,
     ITEMS_FETCH_CHECKPOINT,
+    ITEMS_SKIP_EXISTING,
     DATA_DIR,
     LOGS_DIR,
     EXPORT_DIR,
@@ -24,6 +26,10 @@ from .settings import (
     SESSION_COOKIE_HTTPONLY,
     SESSION_COOKIE_SAMESITE,
     DATABASE_URL,
+    # Funções de controle de cancelamento (Ctrl+C)
+    request_cancel,
+    reset_cancel,
+    is_cancelled,
 )
 
 __all__ = [
@@ -32,9 +38,11 @@ __all__ = [
     "PAGE_SIZE",
     "MAX_RETRIES",
     "RETRY_DELAY",
+    "RETRY_BACKOFF_MULTIPLIER",
     "ITEMS_FETCH_THREADS",
     "ITEMS_FETCH_DELAY_PER_THREAD",
     "ITEMS_FETCH_CHECKPOINT",
+    "ITEMS_SKIP_EXISTING",
     "DATA_DIR",
     "LOGS_DIR",
     "EXPORT_DIR",
@@ -49,4 +57,8 @@ __all__ = [
     "SESSION_COOKIE_HTTPONLY",
     "SESSION_COOKIE_SAMESITE",
     "DATABASE_URL",
+    # Funções de controle de cancelamento
+    "request_cancel",
+    "reset_cancel",
+    "is_cancelled",
 ]
