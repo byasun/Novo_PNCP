@@ -165,12 +165,17 @@ input {
   flex-wrap: wrap;
 }
 
+
+/* Ajuste para 4 colunas maiores, sem ultrapassar o card */
 .table__head,
 .table__row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 2fr 3fr 1.2fr;
-  gap: 1rem;
-  padding: 0.6rem 0.75rem;
+  grid-template-columns: 1.5fr 2fr 2.5fr 1.5fr;
+  gap: 1.2rem;
+  padding: 0.7rem 0.9rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 
 .table__head {
