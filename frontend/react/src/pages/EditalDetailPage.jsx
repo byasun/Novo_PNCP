@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useAuth, formatCNPJ, formatDateBR, formatCurrencyBRL } from '../App'
+import { useAuth, formatCNPJ, formatDateBR, formatCurrencyBRL, fetchJson } from '../App'
 
 import Card from '../components/Card'
 
@@ -78,18 +78,18 @@ const EditalDetailPage = () => {
         <h2>Itens</h2>
         <p>Total de itens: {itens.length}</p>
         <div className="table table--fullwidth">
-          <div className="table__head" style={{ display: 'flex', width: '100%' }}>
-            <span style={{ flex: 1, textAlign: 'left' }}>Descrição</span>
-            <span style={{ flex: 1, textAlign: 'center' }}>Quantidade</span>
-            <span style={{ flex: 1, textAlign: 'left' }}>Valor Unitário Estimado</span>
-            <span style={{ flex: 1, textAlign: 'center' }}>Unidade</span>
+          <div className="table__head table__head--flex">
+            <span className="table__col table__col--left">Descrição</span>
+            <span className="table__col table__col--center">Quantidade</span>
+            <span className="table__col table__col--left">Valor Unitário Estimado</span>
+            <span className="table__col table__col--center">Unidade</span>
           </div>
           {itens.map((item, index) => (
-            <div className="table__row" key={item.id || item.numero || index} style={{ display: 'flex', width: '100%' }}>
-              <span style={{ flex: 1, textAlign: 'left' }}>{item.descricao || item.item || '—'}</span>
-              <span style={{ flex: 1, textAlign: 'center' }}>{item.quantidade || item.qtd || '—'}</span>
-              <span style={{ flex: 1, textAlign: 'left' }}>{typeof item.valorUnitarioEstimado !== 'undefined' ? formatCurrencyBRL(item.valorUnitarioEstimado) : '—'}</span>
-              <span style={{ flex: 1, textAlign: 'center' }}>{item.unidade || item.un || '—'}</span>
+            <div className="table__row table__row--flex" key={item.id || item.numero || index}>
+              <span className="table__col table__col--left">{item.descricao || item.item || '—'}</span>
+              <span className="table__col table__col--center">{item.quantidade || item.qtd || '—'}</span>
+              <span className="table__col table__col--left">{typeof item.valorUnitarioEstimado !== 'undefined' ? formatCurrencyBRL(item.valorUnitarioEstimado) : '—'}</span>
+              <span className="table__col table__col--center">{item.unidade || item.un || '—'}</span>
             </div>
           ))}
         </div>

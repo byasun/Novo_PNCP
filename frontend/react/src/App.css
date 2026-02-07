@@ -1,3 +1,18 @@
+.table__head--flex,
+.table__row--flex {
+  display: flex;
+  width: 100%;
+}
+
+.table__col {
+  flex: 1;
+}
+.table__col--left {
+  text-align: left;
+}
+.table__col--center {
+  text-align: center;
+}
 #root {
   max-width: 1200px;
   margin: 0 auto;
