@@ -5,6 +5,7 @@ const formatCNPJ = (cnpj) => {
   if (digits.length !== 14) return cnpj;
   return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12,14)}`;
 }
+
 // Formata datas para DD/MM/YYYY
 const formatDateBR = (dateString) => {
   if (!dateString) return '—';
@@ -201,12 +202,27 @@ const RequireAuth = ({ children }) => {
   return children
 }
 
+const LandingPage = () => {
+  return (
+    <div className="grid">
+      <div className="card">
+        <h2>Bem-vindo ao Portal de Editais</h2>
+        <p>Acesse editais públicos após autenticação.</p>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <Link className="btn" to="/login">Login</Link>
+          <Link className="btn" to="/users/new">Criar usuário</Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const HomeRedirect = () => {
   const { authStatus } = useAuth()
   if (authStatus === 'authenticated') {
     return <Navigate to="/editais" replace />
   }
-  return <Navigate to="/login" replace />
+  return <LandingPage />
 }
 
 const LoginPage = () => {
@@ -270,9 +286,10 @@ const LoginPage = () => {
 }
 
 const CreateUserPage = () => {
-  const { createUser, setMessage } = useAuth()
+  const { createUser, login, setMessage } = useAuth()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '', confirm: '' })
+  const navigate = useNavigate()
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -281,7 +298,8 @@ const CreateUserPage = () => {
     try {
       await createUser(form)
       setMessage('Usuário criado com sucesso.')
-      setForm({ name: '', username: '', email: '', password: '', confirm: '' })
+      await login({ username: form.username, password: form.password })
+      navigate('/editais')
     } catch (err) {
       setMessage(err.message)
     } finally {
@@ -603,7 +621,7 @@ function App() {
       <AuthProvider>
         <Layout>
           <Routes>
-            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/users/new" element={<CreateUserPage />} />
             <Route
