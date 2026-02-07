@@ -37,6 +37,10 @@ import EditaisPage from './pages/EditaisPage'
 import EditalDetailPage from './pages/EditalDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
 
+import Header from './components/Header'
+import Navbar from './components/Navbar'
+import Footer from './components/Footer'
+
 const AuthContext = createContext(null)
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -153,6 +157,11 @@ const AuthProvider = ({ children }) => {
       }}
     >
       {children}
+      <Footer>
+        <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.9em', color: '#888' }}>
+          &copy; {new Date().getFullYear()} PNCP - Todos os direitos reservados.
+        </div>
+      </Footer>
     </AuthContext.Provider>
   )
 }
@@ -175,22 +184,22 @@ const Layout = ({ children }) => {
 
   return (
     <div className="app">
-      <header className="app__header">
+      <Header>
         <div>
           <p className="app__eyebrow">PNCP</p>
           <h1>Portal de Editais</h1>
         </div>
         {authStatus === 'authenticated' && (
-          <div className="nav">
+          <Navbar>
             <span>
               {statusInfo?.name || statusInfo?.username || 'Usuário'}
             </span>
             <button className="btn btn--ghost" onClick={handleLogout}>
               Sair
             </button>
-          </div>
+          </Navbar>
         )}
-      </header>
+      </Header>
       {message && <div className="alert">{message}</div>}
       {children}
     </div>

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth, formatCNPJ, formatDateBR, formatCurrencyBRL } from '../App'
 
+import Card from '../components/Card'
+
 const EditalDetailPage = () => {
   const { editalKey } = useParams()
   const { setMessage } = useAuth()
@@ -28,7 +30,7 @@ const EditalDetailPage = () => {
 
   return (
     <div className="stack">
-      <div className="card">
+      <Card>
         <div className="card__title">
           <div>
             <h2>Detalhe do edital</h2>
@@ -71,9 +73,8 @@ const EditalDetailPage = () => {
             </div>
           </div>
         )}
-      </div>
-
-      <div className="card">
+      </Card>
+      <Card>
         <h2>Itens</h2>
         <p>Total de itens: {itens.length}</p>
         <div className="table table--fullwidth">
@@ -92,7 +93,7 @@ const EditalDetailPage = () => {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

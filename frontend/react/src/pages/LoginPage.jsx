@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 
+import Button from '../components/Button'
+
 const LoginPage = () => {
   const { authStatus, login, setMessage } = useAuth()
   const navigate = useNavigate()
@@ -51,9 +53,9 @@ const LoginPage = () => {
             required
           />
         </label>
-        <button className="btn" type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading}>
           Entrar
-        </button>
+        </Button>
         <p className="helper">
           Não tem conta? <Link to="/users/new">Criar usuário</Link>
         </p>

@@ -1,23 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth, formatCNPJ, getEditalCnpj, getEditalRazaoSocial, getEditalObjeto, getEditalKey, formatCurrencyBRL } from '../App'
+import { useAuth, formatCNPJ, getEditalCnpj, getEditalRazaoSocial, getEditalObjeto, getEditalKey, formatCurrencyBRL, fetchJson } from '../App'
+
+import { Table, TableHead, TableRow } from '../components/Table'
 
 const EditaisPage = () => {
+  console.log('Montando EditaisPage')
   const { statusInfo, refreshStatus, setMessage } = useAuth()
   const [loading, setLoading] = useState(false)
   const [editais, setEditais] = useState([])
   const [search, setSearch] = useState('')
 
   const loadEditais = useCallback(async () => {
+    console.log('Iniciando loadEditais: antes do fetchJson')
     try {
       const data = await fetchJson('/api/editais')
+      console.log('Resposta do fetchJson /api/editais:', data)
       setEditais(data.data || [])
     } catch (err) {
+      console.error('Erro no fetchJson /api/editais:', err)
       setMessage(err.message)
     }
   }, [setMessage])
 
   useEffect(() => {
+    console.log('Chamando loadEditais')
     loadEditais()
   }, [loadEditais])
 
@@ -100,13 +107,13 @@ const EditaisPage = () => {
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <div className="table">
-          <div className="table__head">
+        <Table>
+          <TableHead>
             <span>CNPJ</span>
             <span>Razão social</span>
             <span>Objeto</span>
             <span>Valor estimado</span>
-          </div>
+          </TableHead>
           {filteredEditais.map((edital, index) => {
             const chave = getEditalKey(edital)
             const objeto = getEditalObjeto(edital)
@@ -124,18 +131,20 @@ const EditaisPage = () => {
             )
             if (chave) {
               return (
-                <Link className="table__row table__row--link" key={key} to={`/edital/${chave}`}>
-                  {content}
-                </Link>
+                <TableRow key={key} className="table__row--link">
+                  <Link to={`/edital/${chave}`} style={{ display: 'contents', color: 'inherit', textDecoration: 'none' }}>
+                    {content}
+                  </Link>
+                </TableRow>
               )
             }
             return (
-              <div className="table__row" key={key}>
+              <TableRow key={key}>
                 {content}
-              </div>
+              </TableRow>
             )
           })}
-        </div>
+        </Table>
       </div>
     </div>
   )
