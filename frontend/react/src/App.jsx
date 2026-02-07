@@ -16,6 +16,7 @@ const formatDateBR = (dateString) => {
     year: 'numeric',
   });
 }
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   BrowserRouter,
@@ -32,6 +33,7 @@ import './App.css'
 const AuthContext = createContext(null)
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
+
 const normalizedBase = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE
 
 const buildUrl = (path) => {

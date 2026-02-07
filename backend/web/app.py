@@ -233,17 +233,15 @@ def download_file(filename):
         return jsonify({"error": "File not found"}), 404
     # Build absolute path to data directory
     file_path = os.path.join(DATA_DIR, filename)
-    # If file does not exist, try to generate it from current data
-    if not os.path.exists(file_path):
-        try:
-            # Export editais to requested format
-            editais = data_manager.load_editais()
-            exporter.export_editais(editais)
-        except Exception as e:
-            logger.error(f"Error generating export file {filename}: {e}")
+    try:
+        # Sempre exporta/atualiza os arquivos antes de servir
+        editais = data_manager.load_editais()
+        exporter.export_editais(editais)
+    except Exception as e:
+        logger.error(f"Error generating export file {filename}: {e}")
+        return jsonify({"error": "File not available yet"}), 404
     if not os.path.exists(file_path):
         return jsonify({"error": "File not available yet"}), 404
-    
     return send_file(file_path, as_attachment=True)
 
 

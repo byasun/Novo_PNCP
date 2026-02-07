@@ -58,7 +58,10 @@ class Exporter:
                 # remove control characters (0x00-0x1F and 0x7F-0x9F)
                 return re.sub(r'[\x00-\x1F\x7F-\x9F]', '', s)
 
-            df = df.applymap(lambda v: clean_str(v) if isinstance(v, str) else v)
+            # Compatível com pandas antigos: limpa apenas colunas de texto
+            for col in df.columns:
+                if df[col].dtype == "object":
+                    df[col] = df[col].map(clean_str)
 
             csv_path = os.path.join(self.export_dir, "editais.csv")
             df.to_csv(csv_path, index=False, encoding="utf-8-sig")
@@ -95,8 +98,9 @@ class Exporter:
                         return re.sub(r'[\x00-\x1F\x7F-\x9F]', '', s)
 
                     # Coerce all values to strings and aggressively clean control chars
-                    df = df.astype(str).applymap(lambda v: aggressive_clean(v))
-                    df_itens = df_itens.astype(str).applymap(lambda v: aggressive_clean(v))
+                    for dframe in [df, df_itens]:
+                        for col in dframe.columns:
+                            dframe[col] = dframe[col].map(aggressive_clean)
                     _write_xlsx(df, df_itens, xlsx_path)
                     logger.info(f"Exported editais and itens to {xlsx_path} after aggressive cleanup")
                 except Exception as e2:
