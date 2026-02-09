@@ -3,6 +3,8 @@
 from flask import Flask, jsonify, send_file, request, send_from_directory
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+# Clerk JWT auth
+from backend.web.clerk_auth import clerk_login_required
 from flask_wtf.csrf import CSRFProtect
 import os
 import logging
@@ -38,6 +40,14 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 REACT_DIST_DIR = os.path.join(FRONTEND_DIR, "react", "dist")
 
 app = Flask(__name__, static_folder=REACT_DIST_DIR, static_url_path="/assets")
+
+# Endpoint Clerk protegido (deve vir após definição de app)
+@app.route("/api/secure-clerk")
+@clerk_login_required
+def api_secure_clerk():
+    # Exemplo de endpoint protegido por Clerk JWT
+    user = getattr(request, "clerk_user", {})
+    return jsonify({"message": "Acesso autorizado via Clerk!", "user": user})
 # CORS para frontend separado (React)
 allowed_origins_env = os.getenv("PNCP_FRONTEND_ORIGINS", "")
 allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
