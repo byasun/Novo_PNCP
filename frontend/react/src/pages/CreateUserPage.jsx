@@ -23,7 +23,9 @@ const CreateUserPage = () => {
   return (
     <div className="grid">
       <div className="card">
-        <SignUp routing="path" path="/users/new" />
+        <div className="actions">
+          <SignUp routing="path" path="/users/new" />
+        </div>
       </div>
     </div>
   );

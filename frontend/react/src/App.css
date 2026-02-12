@@ -1,3 +1,156 @@
+/* Mobile S: até 320px */
+@media (max-width: 320px) {
+  .card {
+    max-width: 98vw;
+    padding: 0.3rem;
+    border-radius: 0.3rem;
+  }
+  .btn {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.2rem;
+  }
+  h2 {
+    font-size: 0.9rem;
+  }
+  h1 {
+    font-size: 1rem;
+  }
+}
+
+/* Mobile M: 321px a 375px */
+@media (min-width: 321px) and (max-width: 375px) {
+  .card {
+    max-width: 98vw;
+    padding: 0.4rem;
+    border-radius: 0.35rem;
+  }
+  .btn {
+    font-size: 0.92rem;
+    padding: 0.55rem 0.3rem;
+  }
+  h2 {
+    font-size: 0.98rem;
+  }
+  h1 {
+    font-size: 1.1rem;
+  }
+}
+
+/* Mobile L: 376px a 425px */
+@media (min-width: 376px) and (max-width: 425px) {
+  .card {
+    max-width: 99vw;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+  }
+  .btn {
+    font-size: 0.98rem;
+    padding: 0.6rem 0.4rem;
+  }
+  h2 {
+    font-size: 1.05rem;
+  }
+  h1 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Tablet: 426px a 768px */
+@media (min-width: 426px) and (max-width: 768px) {
+  #root {
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 0.1rem;
+  }
+  .card {
+    max-width: 98vw;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+  }
+  .btn {
+    font-size: 0.95rem;
+    padding: 0.6rem 0.3rem;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  h1 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Laptop: 769px a 1024px */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #root {
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 0.1rem;
+  }
+  .card {
+    max-width: 98vw;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+  }
+  .btn {
+    font-size: 0.95rem;
+    padding: 0.6rem 0.3rem;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  h1 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Laptop L: 1025px a 1440px */
+@media (min-width: 1025px) and (max-width: 1440px) {
+  #root {
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 0.1rem;
+  }
+  .card {
+    max-width: 98vw;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+  }
+  .btn {
+    font-size: 0.95rem;
+    padding: 0.6rem 0.3rem;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  h1 {
+    font-size: 1.2rem;
+  }
+}
+
+/* 4K: 1441px a 2560px */
+@media (min-width: 1441px) and (max-width: 2560px) {
+  #root {
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 0.1rem;
+  }
+  .card {
+    max-width: 98vw;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+  }
+  .btn {
+    font-size: 0.95rem;
+    padding: 0.6rem 0.3rem;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  h1 {
+    font-size: 1.2rem;
+  }
+}
+
 .table__head--flex,
 .table__row--flex {
   display: flex;
@@ -7,16 +160,20 @@
 .table__col {
   flex: 1;
 }
+
 .table__col--left {
   text-align: left;
 }
+
 .table__col--center {
   text-align: center;
 }
+
 #root {
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1.5rem;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #111827;
 }
@@ -39,8 +196,16 @@ body {
 .app__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 1rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.app__header > * {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .nav {
@@ -113,8 +278,35 @@ h2 {
 
 .actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
   gap: 0.75rem;
+}
+
+.actions .btn,
+.actions button,
+.actions a.btn {
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
+}
+
+/* Exceções para EditaisPage e EditalDetailPage */
+.actions--editais,
+.actions--edital-detail {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.actions--editais .btn,
+.actions--editais button,
+.actions--editais a.btn,
+.actions--edital-detail .btn,
+.actions--edital-detail button,
+.actions--edital-detail a.btn {
+  width: auto;
+  max-width: none;
 }
 
 label {
@@ -179,7 +371,6 @@ input {
   margin-bottom: 1rem;
   flex-wrap: wrap;
 }
-
 
 /* Ajuste para 4 colunas maiores, sem ultrapassar o card */
 .table__head,

@@ -16,9 +16,11 @@ const SsoCallbackPage = () => {
   return (
     <div className="grid">
       <div className="card">
-        <h2>Processando autenticação...</h2>
-        {!isLoaded && <p>Aguardando Clerk...</p>}
-        {isLoaded && !isSignedIn && <p>Erro: não autenticado pelo Clerk.</p>}
+        <div className="actions">
+          <h2>Processando autenticação...</h2>
+          {!isLoaded && <p>Aguardando Clerk...</p>}
+          {isLoaded && !isSignedIn && <p>Erro: não autenticado pelo Clerk.</p>}
+        </div>
       </div>
     </div>
   );

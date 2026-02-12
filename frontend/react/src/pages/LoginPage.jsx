@@ -22,7 +22,9 @@ const LoginPage = () => {
   return (
     <div className="grid">
       <div className="card">
-        <SignIn routing="path" path="/login" />
+        <div className="actions">
+          <SignIn routing="path" path="/login" />
+        </div>
       </div>
     </div>
   );
