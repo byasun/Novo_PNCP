@@ -1,32 +1,40 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { useAuth, formatCNPJ, formatDateBR, formatCurrencyBRL, fetchJson } from '../App'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { formatCNPJ, formatDateBR, formatCurrencyBRL, fetchJson } from '../App'
+import { useAuth } from '@clerk/react-router';
 
 import Card from '../components/Card'
 
 const EditalDetailPage = () => {
-  const { editalKey } = useParams()
-  const { setMessage } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [edital, setEdital] = useState(null)
-  const [itens, setItens] = useState([])
+  const { editalKey } = useParams();
+  const { setMessage, isSignedIn } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [edital, setEdital] = useState(null);
+  const [itens, setItens] = useState([]);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      navigate('/login');
+    }
+  }, [isSignedIn, navigate]);
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
-        const editalData = await fetchJson(`/api/editais/${editalKey}`)
-        setEdital(editalData.data)
-        const itensData = await fetchJson(`/api/editais/${editalKey}/itens`)
-        setItens(itensData.data || [])
+        const editalData = await fetchJson(`/api/editais/${editalKey}`);
+        setEdital(editalData.data);
+        const itensData = await fetchJson(`/api/editais/${editalKey}/itens`);
+        setItens(itensData.data || []);
       } catch (err) {
-        setMessage(err.message)
+        setMessage(err.message);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    load()
-  }, [editalKey, setMessage])
+    };
+    load();
+  }, [editalKey, setMessage]);
 
   return (
     <div className="stack">

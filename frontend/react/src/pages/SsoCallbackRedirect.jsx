@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const SsoCallbackRedirect = () => {
+const SsoCallbackRedirect = () => { 
   const navigate = useNavigate();
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+// Removido uso de useAuth fora do componente
 import React from 'react'
 import { Link } from 'react-router-dom'
 

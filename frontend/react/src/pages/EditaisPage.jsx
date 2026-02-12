@@ -1,27 +1,40 @@
+import { useClerkApi } from '../hooks/useClerkApi';
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useAuth, formatCNPJ, getEditalCnpj, getEditalRazaoSocial, getEditalObjeto, getEditalKey, formatCurrencyBRL, fetchJson } from '../App'
+import { Link, useNavigate } from 'react-router-dom'
+import { formatCNPJ, getEditalCnpj, getEditalRazaoSocial, getEditalObjeto, getEditalKey, formatCurrencyBRL, fetchJson } from '../App'
+import { useAuth } from '@clerk/react-router';
 
 import { Table, TableHead, TableRow } from '../components/Table'
 
 const EditaisPage = () => {
   console.log('Montando EditaisPage')
+  // Diagnóstico
+  console.log('[EditaisPage] isSignedIn:', isSignedIn);
   const { statusInfo, refreshStatus, setMessage } = useAuth()
   const [loading, setLoading] = useState(false)
   const [editais, setEditais] = useState([])
   const [search, setSearch] = useState('')
+  const { isSignedIn } = useAuth();
+  const navigate = useNavigate();
 
+  React.useEffect(() => {
+    if (!isSignedIn) {
+      navigate('/login');
+    }
+  }, [isSignedIn, navigate]);
+
+  const { fetchWithClerk } = useClerkApi();
   const loadEditais = useCallback(async () => {
-    console.log('Iniciando loadEditais: antes do fetchJson')
+    console.log('Iniciando loadEditais: antes do fetchWithClerk')
     try {
-      const data = await fetchJson('/api/editais')
-      console.log('Resposta do fetchJson /api/editais:', data)
+      const data = await fetchWithClerk('/api/editais')
+      console.log('Resposta do fetchWithClerk /api/editais:', data)
       setEditais(data.data || [])
     } catch (err) {
-      console.error('Erro no fetchJson /api/editais:', err)
+      console.error('Erro no fetchWithClerk /api/editais:', err)
       setMessage(err.message)
     }
-  }, [setMessage])
+  }, [setMessage, fetchWithClerk])
 
   useEffect(() => {
     console.log('Chamando loadEditais')
@@ -145,6 +158,10 @@ const EditaisPage = () => {
             )
           })}
         </Table>
+        <div style={{marginTop: '2rem', color: 'red'}}>
+          <strong>Diagnóstico:</strong>
+          <pre>{JSON.stringify({ isSignedIn }, null, 2)}</pre>
+        </div>
       </div>
     </div>
   )

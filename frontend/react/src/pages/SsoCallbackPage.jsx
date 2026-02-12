@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/react-router';
 
@@ -6,7 +6,7 @@ const SsoCallbackPage = () => {
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useAuth();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLoaded) return;
     if (isSignedIn) {
       navigate('/editais');
