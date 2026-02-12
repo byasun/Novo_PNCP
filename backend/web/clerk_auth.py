@@ -25,19 +25,20 @@ def get_clerk_jwks():
 def verify_clerk_jwt(token):
     jwks = get_clerk_jwks()
     unverified_header = jwt.get_unverified_header(token)
+    from jwt import PyJWK
     for key in jwks["keys"]:
         if key["kid"] == unverified_header["kid"]:
-            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)
+            public_key = PyJWK(key).key
             break
     else:
         raise Exception("Public key not found in JWKS")
+    # Não exigir audience (aud) na validação
     payload = jwt.decode(
         token,
         public_key,
         algorithms=[unverified_header["alg"]],
-        audience=CLERK_AUDIENCE,
         issuer=CLERK_ISSUER,
-        options={"verify_aud": CLERK_AUDIENCE is not None}
+        options={"verify_aud": False}
     )
     return payload
 

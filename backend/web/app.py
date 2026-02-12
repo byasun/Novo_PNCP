@@ -228,7 +228,7 @@ def api_editais_count():
     return jsonify({"total": len(editais)})
 
 @app.route("/api/status")
-@login_required
+@clerk_login_required
 def api_status():
     # Status da aplicação e do scheduler
     editais = editais_service.get_all_editais_local()
