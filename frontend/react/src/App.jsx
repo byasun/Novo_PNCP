@@ -20,14 +20,16 @@ const formatDateBR = (dateString) => {
 
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useClerkApi } from './hooks/useClerkApi';
 import {
-  BrowserRouter,
   Routes,
   Route,
   Navigate,
   useNavigate,
   useLocation,
 } from 'react-router-dom'
+import SsoCallbackPage from './pages/SsoCallbackPage';
+import SsoCallbackRedirect from './pages/SsoCallbackRedirect';
 import './App.css'
 
 import LandingPage from './pages/LandingPage'
@@ -103,45 +105,55 @@ const formatCurrencyBRL = (value) => {
 const useAuth = () => useContext(AuthContext)
 
 const AuthProvider = ({ children }) => {
-  const [authStatus, setAuthStatus] = useState('loading')
-  const [statusInfo, setStatusInfo] = useState(null)
-  const [message, setMessage] = useState('')
+  const [authStatus, setAuthStatus] = useState('loading');
+  const [statusInfo, setStatusInfo] = useState(null);
+  const [message, setMessage] = useState('');
+  const { fetchWithClerk } = useClerkApi();
 
   const refreshStatus = useCallback(async () => {
+    // Primeiro tenta autenticação local
     try {
-      const data = await fetchJson('/api/status')
-      setStatusInfo(data)
-      setAuthStatus('authenticated')
-      return true
+      const data = await fetchJson('/api/status');
+      setStatusInfo(data);
+      setAuthStatus('authenticated');
+      return true;
     } catch (err) {
+      // Se não autenticado localmente, tenta Clerk
       if (err.status === 401) {
-        setAuthStatus('unauthenticated')
-        setStatusInfo(null)
-        return false
+        try {
+          const clerkData = await fetchWithClerk('/api/clerk-status');
+          setStatusInfo(clerkData);
+          setAuthStatus('authenticated');
+          return true;
+        } catch (clerkErr) {
+          setAuthStatus('unauthenticated');
+          setStatusInfo(null);
+          return false;
+        }
       }
-      setMessage(err.message)
-      return false
+      setMessage(err.message);
+      return false;
     }
-  }, [])
+  }, [fetchWithClerk]);
 
   useEffect(() => {
-    refreshStatus()
-  }, [refreshStatus])
+    refreshStatus();
+  }, [refreshStatus]);
 
   const login = async (payload) => {
-    await fetchJson('/login', { method: 'POST', body: JSON.stringify(payload) })
-    await refreshStatus()
-  }
+    await fetchJson('/login', { method: 'POST', body: JSON.stringify(payload) });
+    await refreshStatus();
+  };
 
   const logout = async () => {
-    await fetchJson('/logout', { method: 'POST' })
-    setAuthStatus('unauthenticated')
-    setStatusInfo(null)
-  }
+    await fetchJson('/logout', { method: 'POST' });
+    setAuthStatus('unauthenticated');
+    setStatusInfo(null);
+  };
 
   const createUser = async (payload) => {
-    await fetchJson('/users/new', { method: 'POST', body: JSON.stringify(payload) })
-  }
+    await fetchJson('/users/new', { method: 'POST', body: JSON.stringify(payload) });
+  };
 
   return (
     <AuthContext.Provider
@@ -163,24 +175,18 @@ const AuthProvider = ({ children }) => {
         </div>
       </Footer>
     </AuthContext.Provider>
-  )
-}
+  );
+};
 
-const Layout = ({ children }) => {
-  const { authStatus, logout, message, setMessage, statusInfo } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
+const Layout = ({ children, onLogout }) => {
+  const { authStatus, message, setMessage, statusInfo } = useAuth();
+  const location = useLocation();
 
   useEffect(() => {
     if (message) {
-      setMessage('')
+      setMessage('');
     }
-  }, [location.pathname, message, setMessage])
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
+  }, [location.pathname, message, setMessage]);
 
   return (
     <div className="app">
@@ -194,7 +200,7 @@ const Layout = ({ children }) => {
             <span>
               {statusInfo?.name || statusInfo?.username || 'Usuário'}
             </span>
-            <button className="btn btn--ghost" onClick={handleLogout}>
+            <button className="btn btn--ghost" onClick={onLogout}>
               Sair
             </button>
           </Navbar>
@@ -203,8 +209,8 @@ const Layout = ({ children }) => {
       {message && <div className="alert">{message}</div>}
       {children}
     </div>
-  )
-}
+  );
+};
 
 const RequireAuth = ({ children }) => {
   const { authStatus } = useAuth()
@@ -218,36 +224,42 @@ const RequireAuth = ({ children }) => {
 }
 
 function App() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/users/new" element={<CreateUserPage />} />
-            <Route
-              path="/editais"
-              element={
-                <RequireAuth>
-                  <EditaisPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/edital/:editalKey"
-              element={
-                <RequireAuth>
-                  <EditalDetailPage />
-                </RequireAuth>
-              }
-            />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Layout>
-      </AuthProvider>
-    </BrowserRouter>
-  )
+    <Layout onLogout={handleLogout}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/users/new" element={<CreateUserPage />} />
+        <Route path="/users/new/sso-callback" element={<SsoCallbackPage />} />
+        <Route path="/login/sso-callback" element={<SsoCallbackRedirect />} />
+        <Route
+          path="/editais"
+          element={
+            <RequireAuth>
+              <EditaisPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/edital/:editalKey"
+          element={
+            <RequireAuth>
+              <EditalDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Layout>
+  );
 }
 
 export {
@@ -259,7 +271,8 @@ export {
   getEditalKey,
   formatCurrencyBRL,
   formatDateBR,
-  fetchJson
+  fetchJson,
+  AuthProvider
 }
 
 export default App

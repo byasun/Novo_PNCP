@@ -1,10 +1,16 @@
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useAuth as useClerkAuth } from '@clerk/react-router';
 
 export function useClerkApi() {
-  const { getToken } = useClerkAuth();
+  const { getToken, isSignedIn } = useClerkAuth();
 
   const fetchWithClerk = async (url, options = {}) => {
-    const token = await getToken();
+    console.log('[Clerk] isSignedIn:', isSignedIn);
+    // Tenta obter o token com template (default)
+    let token = await getToken({ template: 'default' });
+    if (!token) {
+      token = await getToken();
+    }
+    console.log('[Clerk] JWT obtido:', token);
     const res = await fetch(url, {
       ...options,
       headers: {

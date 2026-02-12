@@ -1,9 +1,34 @@
+from backend.web.clerk_auth import clerk_login_required
 """Aplicação web Flask (API + SPA React)."""
 
 from flask import Flask, jsonify, send_file, request, send_from_directory
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+import backend.storage.auth_db as auth_db
+
+# Inicialização do Flask app
+app = Flask(__name__)
+CORS(app)
+login_manager = LoginManager(app)
+
 # Clerk JWT auth
+# Endpoint para registrar usuário Clerk autenticado
+
+@app.route("/api/register-clerk-user", methods=["POST"])
+@clerk_login_required
+def register_clerk_user():
+    user = getattr(request, "clerk_user", {})
+    clerk_id = user.get("sub")
+    email = user.get("email")
+    name = user.get("name") or user.get("given_name")
+    # Cria usuário no banco de dados
+    if not clerk_id or not email:
+        return {"error": "Dados insuficientes do Clerk"}, 400
+    # Verifica se já existe
+    if auth_db.user_exists(clerk_id):
+        return {"message": "Usuário já registrado", "clerk_id": clerk_id}, 200
+    auth_db.create_user(clerk_id, email, name)
+    return {"message": "Usuário registrado com sucesso", "clerk_id": clerk_id}, 201
 from backend.web.clerk_auth import clerk_login_required
 from flask_wtf.csrf import CSRFProtect
 import os
@@ -39,7 +64,21 @@ PROJECT_ROOT = os.path.abspath(os.path.join(WEB_DIR, "..", ".."))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 REACT_DIST_DIR = os.path.join(FRONTEND_DIR, "react", "dist")
 
-app = Flask(__name__, static_folder=REACT_DIST_DIR, static_url_path="/assets")
+app = Flask(__name__, static_folder=REACT_DIST_DIR)
+
+# Endpoint para status autenticado via Clerk (deve vir após definição do app)
+@app.route("/api/clerk-status")
+@clerk_login_required
+def api_clerk_status():
+    user = getattr(request, "clerk_user", {})
+    return jsonify({
+        "status": "authenticated",
+        "clerk_id": user.get("sub"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "username": user.get("username"),
+        "user": user
+    })
 
 # Endpoint Clerk protegido (deve vir após definição de app)
 @app.route("/api/secure-clerk")
@@ -343,14 +382,23 @@ def spa_routes(edital_key=None):
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
+    full_path = os.path.join(REACT_DIST_DIR, "assets", filename)
+    print("Servindo arquivo estático:", full_path)
     return send_from_directory(os.path.join(REACT_DIST_DIR, "assets"), filename)
 
-
-@app.route("/<path:path>")
 def serve_spa_fallback(path):
     full_path = os.path.join(REACT_DIST_DIR, path)
     if os.path.exists(full_path) and os.path.isfile(full_path):
         return send_from_directory(REACT_DIST_DIR, path)
+    return _serve_spa()
+@app.route("/<path:path>")
+def serve_spa_fallback(path):
+    # Serve index.html para qualquer rota não-API
+    if path.startswith("api/") or path.startswith("assets/"):
+        full_path = os.path.join(REACT_DIST_DIR, path)
+        if os.path.exists(full_path) and os.path.isfile(full_path):
+            return send_from_directory(REACT_DIST_DIR, path)
+        return _serve_spa()
     return _serve_spa()
 
 if __name__ == "__main__":

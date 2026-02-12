@@ -1,6 +1,26 @@
-"""Persistência de usuários e autenticação via SQLAlchemy."""
 
 from __future__ import annotations
+# Funções para Clerk
+import sqlite3
+import os
+
+DB_PATH = os.path.join(os.path.dirname(__file__), '../data/users.db.bak')
+
+def user_exists(clerk_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM users WHERE clerk_id=?", (clerk_id,))
+    exists = cur.fetchone() is not None
+    conn.close()
+    return exists
+
+def create_user(clerk_id, email, name):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO users (clerk_id, email, name) VALUES (?, ?, ?)", (clerk_id, email, name))
+    conn.commit()
+    conn.close()
+"""Persistência de usuários e autenticação via SQLAlchemy."""
 
 from contextlib import contextmanager
 from datetime import datetime

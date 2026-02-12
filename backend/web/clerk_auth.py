@@ -17,7 +17,7 @@ _jwks_cache = None
 def get_clerk_jwks():
     global _jwks_cache
     if _jwks_cache is None:
-        resp = requests.get(CLERK_JWKS_URL)
+        resp = requests.get(CLERK_JWKS_URL, verify=False)
         resp.raise_for_status()
         _jwks_cache = resp.json()
     return _jwks_cache
@@ -45,13 +45,16 @@ def clerk_login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")
+        print(f"[ClerkAuth] Authorization header recebido: {auth_header}")
         if not auth_header.startswith("Bearer "):
+            print("[ClerkAuth] Header ausente ou inválido.")
             return jsonify({"error": "Missing or invalid Authorization header"}), 401
         token = auth_header.split(" ", 1)[1]
         try:
             user_payload = verify_clerk_jwt(token)
             request.clerk_user = user_payload
         except Exception as e:
+            print(f"[ClerkAuth] Erro ao validar JWT: {str(e)}")
             return jsonify({"error": f"Invalid token: {str(e)}"}), 401
         return f(*args, **kwargs)
     return decorated
