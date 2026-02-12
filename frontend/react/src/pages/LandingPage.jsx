@@ -23,10 +23,6 @@ const LandingPage = () => {
           <a className="btn" href={clerkSignInUrl} target="_blank" rel="noopener noreferrer">Login</a>
           <a className="btn" href={clerkSignUpUrl} target="_blank" rel="noopener noreferrer">Criar usuário</a>
         </div>
-        <div style={{marginTop: '2rem', color: 'red'}}>
-          <strong>Diagnóstico:</strong>
-          <pre>{JSON.stringify({ isSignedIn }, null, 2)}</pre>
-        </div>
       </div>
     </div>
   );

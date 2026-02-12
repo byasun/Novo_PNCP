@@ -7,6 +7,7 @@ import { useAuth } from '@clerk/react-router';
 import { Table, TableHead, TableRow } from '../components/Table'
 
 const EditaisPage = () => {
+  const { isSignedIn } = useAuth();
   console.log('Montando EditaisPage')
   // Diagnóstico
   console.log('[EditaisPage] isSignedIn:', isSignedIn);
@@ -14,7 +15,6 @@ const EditaisPage = () => {
   const [loading, setLoading] = useState(false)
   const [editais, setEditais] = useState([])
   const [search, setSearch] = useState('')
-  const { isSignedIn } = useAuth();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -34,7 +34,7 @@ const EditaisPage = () => {
       console.error('Erro no fetchWithClerk /api/editais:', err)
       setMessage(err.message)
     }
-  }, [setMessage, fetchWithClerk])
+  }, [setMessage])
 
   useEffect(() => {
     console.log('Chamando loadEditais')
@@ -158,10 +158,6 @@ const EditaisPage = () => {
             )
           })}
         </Table>
-        <div style={{marginTop: '2rem', color: 'red'}}>
-          <strong>Diagnóstico:</strong>
-          <pre>{JSON.stringify({ isSignedIn }, null, 2)}</pre>
-        </div>
       </div>
     </div>
   )

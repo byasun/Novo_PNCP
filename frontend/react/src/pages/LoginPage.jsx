@@ -29,10 +29,6 @@ const LoginPage = () => {
         <div className="actions">
           <SignIn routing="path" path="/login" />
         </div>
-        <div style={{marginTop: '2rem', color: 'red'}}>
-          <strong>Diagnóstico:</strong>
-          <pre>{JSON.stringify({ isSignedIn }, null, 2)}</pre>
-        </div>
       </div>
     </div>
   );

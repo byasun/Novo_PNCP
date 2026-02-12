@@ -191,7 +191,7 @@ def spa():
     return _serve_spa()
 
 @app.route("/api/editais")
-@login_required
+@clerk_login_required
 def api_editais():
     # Retorna editais em JSON
     editais = editais_service.get_all_editais_local()
@@ -199,7 +199,7 @@ def api_editais():
 
 
 @app.route("/api/editais/<path:edital_key>")
-@login_required
+@clerk_login_required
 def api_edital_detail(edital_key):
     parts = edital_key.split("_")
     if len(parts) != 3:
@@ -211,7 +211,7 @@ def api_edital_detail(edital_key):
 
 
 @app.route("/api/editais/<path:edital_key>/itens")
-@login_required
+@clerk_login_required
 def api_edital_itens(edital_key):
     parts = edital_key.split("_")
     if len(parts) != 3:
@@ -221,7 +221,7 @@ def api_edital_itens(edital_key):
     return jsonify({"total": len(itens), "data": itens})
 
 @app.route("/api/editais/count")
-@login_required
+@clerk_login_required
 def api_editais_count():
     """Retorna apenas a contagem de editais (tempo real)."""
     editais = editais_service.get_all_editais_local()

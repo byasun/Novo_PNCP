@@ -111,9 +111,9 @@ const AuthProvider = ({ children }) => {
   const { fetchWithClerk } = useClerkApi();
 
   const refreshStatus = useCallback(async () => {
-    // Primeiro tenta autenticação local
+    // Tenta autenticação Clerk diretamente
     try {
-      const data = await fetchJson('/api/status');
+      const data = await fetchWithClerk('/api/status');
       setStatusInfo(data);
       setAuthStatus('authenticated');
       return true;
