@@ -71,6 +71,13 @@ def main():
     app.config["SECRET_KEY"] = runtime_secret
     logger.info("New session secret generated (previous sessions invalidated)")
     
+    # Atualização automática se for a primeira execução do dia
+    try:
+        from backend.scripts.update_if_first_time_today import update_if_first_time_today
+        update_if_first_time_today()
+    except Exception as e:
+        logger.warning(f"Falha ao executar atualização automática diária: {e}")
+
     data_manager = DataManager()
     # Carrega editais locais (se existirem)
     editais = data_manager.load_editais()

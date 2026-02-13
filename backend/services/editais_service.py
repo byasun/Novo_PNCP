@@ -363,11 +363,11 @@ class EditaisService:
                         logger.debug(f"  Edital {idx}/{total}: Page {page}: {len(page_items)} items, total: {len(itens)}")
                         page += 1
 
-            # Anota itens com chaves do edital
+            # Anota itens com chaves do edital (padroniza como string)
             for item in itens:
-                item["edital_cnpj"] = cnpj
-                item["edital_ano"] = ano
-                item["edital_numero"] = numero
+                item["edital_cnpj"] = str(cnpj) if cnpj is not None else ""
+                item["edital_ano"] = str(ano) if ano is not None else ""
+                item["edital_numero"] = str(numero) if numero is not None else ""
 
             if itens:
                 logger.info(f"Completed edital {idx}/{total}: fetched {len(itens)} itens")
@@ -392,13 +392,18 @@ class EditaisService:
         return None
     
     def get_itens_by_edital(self, cnpj, ano, numero):
-        # Filtra itens vinculados a um edital
+        # Filtra itens vinculados a um edital (padroniza como string)
+        cnpj = str(cnpj) if cnpj is not None else ""
+        ano = str(ano) if ano is not None else ""
+        numero = str(numero) if numero is not None else ""
         all_itens = self.data_manager.load_itens()
         return [
             item for item in all_itens
-            if (item.get("edital_cnpj") == cnpj and
-                str(item.get("edital_ano")) == str(ano) and
-                str(item.get("edital_numero")) == str(numero))
+            if (
+                str(item.get("edital_cnpj", "")) == cnpj and
+                str(item.get("edital_ano", "")) == ano and
+                str(item.get("edital_numero", "")) == numero
+            )
         ]
     
     def _generate_edital_key(self, edital):
