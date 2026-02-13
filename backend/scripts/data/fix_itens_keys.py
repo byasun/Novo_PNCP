@@ -1,10 +1,15 @@
-"""
 Script para padronizar os campos de identificação dos itens de edital como string.
 Uso: python backend/scripts/fix_itens_keys.py
 """
 import json
 import os
 
+"""
+Script para padronizar os campos de identificação dos itens de edital como string.
+Uso: python backend/scripts/data/fix_itens_keys.py
+"""
+import json
+import os
 ITENS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "itens.json")
 
 

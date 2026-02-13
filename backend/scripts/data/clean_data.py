@@ -12,7 +12,7 @@ from datetime import datetime
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PARENT_DIR = os.path.abspath(os.path.join(ROOT_DIR, ".."))
 
-# Add parent to sys.path se ao executar de scripts/
+# Add parent to sys.path se ao executar de scripts/data/
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 if ROOT_DIR not in sys.path:

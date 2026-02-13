@@ -1,12 +1,12 @@
 """Script para promover/revogar admin de usuários via terminal.
 
 Uso:
-    python scripts/set_admin.py <username> [true|false]
+    python scripts/user/set_admin.py <username> [true|false]
     
 Exemplos:
-    python scripts/set_admin.py admin true      # Promove a admin
-    python scripts/set_admin.py admin false     # Remove admin
-    python scripts/set_admin.py admin           # Mostra status atual
+    python scripts/user/set_admin.py admin true      # Promove a admin
+    python scripts/user/set_admin.py admin false     # Remove admin
+    python scripts/user/set_admin.py admin           # Mostra status atual
 """
 
 import os
@@ -36,9 +36,9 @@ def main():
     if len(sys.argv) < 2:
         print("Uso: python scripts/set_admin.py <username> [true|false]")
         print("Exemplos:")
-        print("  python scripts/set_admin.py admin true   # Promove a admin")
-        print("  python scripts/set_admin.py admin false  # Remove admin")
-        print("  python scripts/set_admin.py admin        # Mostra status atual")
+        print("  python scripts/user/set_admin.py admin true   # Promove a admin")
+        print("  python scripts/user/set_admin.py admin false  # Remove admin")
+        print("  python scripts/user/set_admin.py admin        # Mostra status atual")
         sys.exit(1)
     
     username = sys.argv[1].strip()

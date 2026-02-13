@@ -1,10 +1,10 @@
 """Script para criar usuários via terminal (uso administrativo).
 
 Uso:
-    python scripts/create_user.py <name> <username> <email> <password>
+    python scripts/user/create_user.py <name> <username> <email> <password>
     
 Exemplo:
-    python scripts/create_user.py "João Silva" joao.silva joao@email.com SenhaForte123!
+    python scripts/user/create_user.py "João Silva" joao.silva joao@email.com SenhaForte123!
 
 A senha deve ter:
 - Mínimo 6 caracteres
@@ -50,8 +50,8 @@ def validate_email(email: str) -> bool:
 
 def main():
     if len(sys.argv) < 5:
-        print("Uso: python scripts/create_user.py <name> <username> <email> <password>")
-        print('Exemplo: python scripts/create_user.py "João Silva" joao.silva joao@email.com SenhaForte123!')
+        print("Uso: python scripts/user/create_user.py <name> <username> <email> <password>")
+        print('Exemplo: python scripts/user/create_user.py "João Silva" joao.silva joao@email.com SenhaForte123!')
         sys.exit(1)
     
     name = sys.argv[1].strip()

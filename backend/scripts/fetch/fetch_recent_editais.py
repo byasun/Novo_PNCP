@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import argparse
 
 # Adiciona a pasta raiz (Novo_PNCP) ao PATH para permitir imports do projeto
-# __file__ = scripts/fetch_recent_editais.py -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
+# __file__ = scripts/fetch/fetch_recent_editais.py -> dirname = fetch -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR, request_cancel
