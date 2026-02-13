@@ -24,7 +24,7 @@ wheels/
 logs/
 
 # Dados
-data/
+backend/data
 
 # Editor e IDE
 .idea/
@@ -58,7 +58,7 @@ ENV/
 tmp/
 
 # Checkpoint sensível
-data/.*.json
+backend/data/.*.json
 
 # OS
 Thumbs.db
