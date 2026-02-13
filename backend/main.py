@@ -33,7 +33,6 @@ from backend.scheduler.job import DailyJob
 from backend.web.app import app, set_job
 from backend.storage.data_manager import DataManager
 
-
 def _invalidate_all_sessions():
     """Invalida todas as sessões ativas ao encerrar o sistema.
     
@@ -45,7 +44,6 @@ def _invalidate_all_sessions():
     app.config["SECRET_KEY"] = str(uuid.uuid4())
     logger.info("All sessions invalidated.")
 
-
 def _shutdown_handler(signum, frame):
     """Handler para sinais de encerramento (SIGINT, SIGTERM)."""
     logger.info("=" * 60)
@@ -53,7 +51,6 @@ def _shutdown_handler(signum, frame):
     logger.info("=" * 60)
     _invalidate_all_sessions()
     sys.exit(0)
-
 
 def main():
     # Registra handlers de encerramento
@@ -71,12 +68,24 @@ def main():
     app.config["SECRET_KEY"] = runtime_secret
     logger.info("New session secret generated (previous sessions invalidated)")
     
-    # Atualização automática se for a primeira execução do dia
+    # 1. Limpa editais/itens expirados
     try:
-        from backend.scripts.update_if_first_time_today import update_if_first_time_today
-        update_if_first_time_today()
+        from backend.scripts.data.remove_expired_editais import main as remove_expired_editais
+        remove_expired_editais()
     except Exception as e:
-        logger.warning(f"Falha ao executar atualização automática diária: {e}")
+        logger.warning(f"Falha ao executar limpeza de editais/itens expirados: {e}")
+
+    # 2. Verifica se é a primeira inicialização do dia
+    try:
+        from backend.scripts.fetch.update_if_first_time_today import already_updated_today, update_if_first_time_today
+        if not already_updated_today():
+            # 3. Se for a primeira inicialização, atualiza editais/itens
+            update_if_first_time_today()
+        else:
+            # 4. Se não for, pula atualização
+            logger.info("Atualização de editais/itens já foi feita hoje. Pulando...")
+    except Exception as e:
+        logger.warning(f"Falha ao verificar/atualizar editais e itens: {e}")
 
     data_manager = DataManager()
     # Carrega editais locais (se existirem)
