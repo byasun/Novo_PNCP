@@ -11,7 +11,6 @@ from backend.config import (
 
 logger = logging.getLogger(__name__)
 
-
 class PNCPClient:
     """Cliente HTTP para a API do PNCP.
 
