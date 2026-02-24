@@ -1,3 +1,19 @@
+"""
+Aplicação web Flask (API + SPA React).
+
+Este módulo implementa a aplicação web principal do sistema PNCP,
+incluindo endpoints de API, autenticação Clerk, integração com o frontend React
+e gerenciamento de sessões de usuário.
+"""
+
+from flask import Flask, jsonify, send_file, request, send_from_directory
+from flask_cors import CORS
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+import backend.storage.auth_db as auth_db
+
+# ...existing code...
+
+# (A definição da rota /api/itens/<id_c_pncp> deve ser movida para depois da criação do objeto app)
 from backend.web.clerk_auth import clerk_login_required
 """
 Aplicação web Flask (API + SPA React).
@@ -219,11 +235,14 @@ def api_edital_detail(edital_key):
 @app.route("/api/editais/<path:edital_key>/itens")
 @clerk_login_required
 def api_edital_itens(edital_key):
-    parts = edital_key.split("_")
-    if len(parts) != 3:
+    # Busca itens por ID_C_PNCP (vinculo único)
+    edital = editais_service.get_edital_by_key(edital_key)
+    if not edital:
         return jsonify({"error": "Edital não encontrado"}), 404
-    cnpj, ano, numero = parts
-    itens = editais_service.get_itens_by_edital(cnpj, ano, numero)
+    id_c_pncp = edital.get("ID_C_PNCP")
+    if not id_c_pncp:
+        return jsonify({"error": "Edital sem ID_C_PNCP"}), 404
+    itens = editais_service.get_itens_by_edital_id(id_c_pncp)
     return jsonify({"total": len(itens), "data": itens})
 
 @app.route("/api/editais/count")

@@ -3,19 +3,18 @@
 // Aguarda autenticação do Clerk e redireciona para editais se autenticado.
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@clerk/react-router';
+import { useAuth } from '../App';
 
 const SsoCallbackPage = () => {
   const navigate = useNavigate();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { authStatus } = useAuth();
 
   // Efeito: ao autenticar via SSO, redireciona para editais
   React.useEffect(() => {
-    if (!isLoaded) return;
-    if (isSignedIn) {
+    if (authStatus === 'authenticated') {
       navigate('/editais');
     }
-  }, [isLoaded, isSignedIn, navigate]);
+  }, [authStatus, navigate]);
 
   return (
     <div className="grid">

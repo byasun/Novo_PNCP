@@ -1,43 +1,64 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { formatCNPJ, formatDateBR, formatCurrencyBRL, fetchJson } from '../App'
-import { useAuth } from '@clerk/react-router';
+import { useClerkApi } from '../hooks/useClerkApi';
+import { useAuth } from '../App';
 
 import Card from '../components/Card'
 
 const EditalDetailPage = () => {
   // Página de detalhes de um edital específico.
   // Busca os dados do edital pelo id na URL e exibe informações detalhadas.
-  const { editalKey } = useParams();
-  const { setMessage, isSignedIn } = useAuth();
+  const { id_c_pncp } = useParams(); // agora usamos id_c_pncp como parâmetro
+  const { setMessage, authStatus, clerkToken } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [edital, setEdital] = useState(null);
   const [itens, setItens] = useState([]);
 
   useEffect(() => {
-    // Verifica se o usuário está autenticado, caso contrário redireciona para a página de login.
-    if (!isSignedIn) {
+    // Só redireciona para login se não estiver autenticado
+    if (authStatus === 'unauthenticated') {
       navigate('/login');
     }
-  }, [isSignedIn, navigate]);
+  }, [authStatus, navigate]);
+
+  const fetchWithClerk = useClerkApi();
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || !clerkToken) return;
+    let isMounted = true;
+    setLoading(true);
+    // Busca o edital correspondente ao ID_C_PNCP
+    fetchWithClerk(`/api/editais`)
+      .then(editaisData => {
+        const editalEncontrado = (editaisData.data || []).find(e => String(e.ID_C_PNCP) === String(id_c_pncp));
+        if (isMounted) setEdital(editalEncontrado || null);
+      })
+      .catch(err => {
+        if (isMounted) setMessage(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [id_c_pncp, fetchWithClerk, authStatus, clerkToken]);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const editalData = await fetchJson(`/api/editais/${editalKey}`);
-        setEdital(editalData.data);
-        const itensData = await fetchJson(`/api/editais/${editalKey}/itens`);
-        setItens(itensData.data || []);
-      } catch (err) {
-        setMessage(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [editalKey, setMessage]);
+    if (authStatus !== 'authenticated' || !clerkToken || !edital) return;
+    let isMounted = true;
+    if (id_c_pncp) {
+      fetchWithClerk(`/api/itens/${id_c_pncp}`)
+        .then(itensData => {
+          if (isMounted) setItens(itensData.data || []);
+        })
+        .catch(err => {
+          if (isMounted) setMessage(err.message);
+        });
+    } else {
+      setItens([]);
+    }
+    return () => { isMounted = false; };
+  }, [edital, id_c_pncp, setMessage, fetchWithClerk, authStatus, clerkToken]);
 
   return (
     <div className="stack">
@@ -45,7 +66,7 @@ const EditalDetailPage = () => {
         <div className="card__title">
           <div>
             <h2>Detalhe do edital</h2>
-            <p>{editalKey}</p>
+            <p>ID_C_PNCP: {edital?.ID_C_PNCP}</p>
           </div>
           <Link to="/editais" className="btn btn--ghost">
             Voltar

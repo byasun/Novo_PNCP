@@ -406,7 +406,7 @@ class PNCPClient:
                     futures = {executor.submit(fetch_page, page): page for page in batch}
                     
                     try:
-                        for future in as_completed(futures, timeout=60):
+                        for future in as_completed(futures, timeout=180):
                             if is_cancelled():
                                 break
                             page_num = futures[future]
@@ -415,11 +415,16 @@ class PNCPClient:
                                 if page_data:
                                     all_editais.extend(page_data)
                                 pages_fetched += 1
-                                
                                 if pages_fetched % 10 == 0:
                                     logger.info(f"Progress: {pages_fetched + 1}/{total_pages} pages, {len(all_editais)} editais collected")
                             except Exception as e:
                                 logger.error(f"Error fetching page {page_num}: {e}")
+                    except TimeoutError as te:
+                        unfinished = [futures[f] for f in futures if not f.done()]
+                        logger.error(f"Timeout: {len(unfinished)} (of {len(futures)}) futures unfinished: {unfinished}")
+                        # Salva progresso parcial
+                        cancelled = True
+                        break
                     except KeyboardInterrupt:
                         logger.warning("\nInterrupção solicitada! Cancelando operações...")
                         request_cancel()

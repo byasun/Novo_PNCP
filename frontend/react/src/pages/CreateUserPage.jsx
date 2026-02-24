@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/react-router';
+import { useAuth } from '../App';
 import React from 'react';
 import { SignUp } from '@clerk/clerk-react';
 import { useClerkApi } from '../hooks/useClerkApi';
@@ -8,11 +8,11 @@ import { useClerkApi } from '../hooks/useClerkApi';
 // Se não autenticado, redireciona para /editais.
 const CreateUserPage = () => {
   const { fetchWithClerk } = useClerkApi();
-  const { isSignedIn } = useAuth();
+  const { authStatus } = useAuth();
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    if (!isSignedIn) {
+    if (authStatus !== 'authenticated') {
       navigate('/editais');
     } else {
       // Registra usuário Clerk no backend
@@ -24,7 +24,7 @@ const CreateUserPage = () => {
           console.error('Erro ao registrar Clerk:', err);
         });
     }
-  }, [isSignedIn, navigate, fetchWithClerk]);
+  }, [authStatus, navigate, fetchWithClerk]);
 
   return (
     <div className="grid">

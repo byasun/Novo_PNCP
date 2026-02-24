@@ -2,7 +2,7 @@ import { useClerkApi } from '../hooks/useClerkApi';
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatCNPJ, getEditalCnpj, getEditalRazaoSocial, getEditalObjeto, getEditalKey, formatCurrencyBRL, fetchJson } from '../App'
-import { useAuth } from '@clerk/react-router';
+import { useAuth } from '../App';
 
 import { Table, TableHead, TableRow } from '../components/Table'
 
@@ -10,10 +10,7 @@ import { Table, TableHead, TableRow } from '../components/Table'
 // Exibe todos os editais disponíveis para o usuário autenticado.
 // Permite busca, atualização manual e navegação para detalhes.
 const EditaisPage = () => {
-  const { isSignedIn } = useAuth();
-  // Diagnóstico de autenticação
-  console.log('[EditaisPage] isSignedIn:', isSignedIn);
-  const { statusInfo, refreshStatus, setMessage } = useAuth()
+  const { authStatus, statusInfo, refreshStatus, setMessage, clerkToken } = useAuth();
   const [loading, setLoading] = useState(false)
   const [editais, setEditais] = useState([])
   const [search, setSearch] = useState('')
@@ -21,26 +18,27 @@ const EditaisPage = () => {
 
   // Redireciona para login se não autenticado
   React.useEffect(() => {
-    if (!isSignedIn) {
+    if (authStatus !== 'authenticated') {
       navigate('/login');
     }
-  }, [isSignedIn, navigate]);
+  }, [authStatus, navigate]);
 
   // Busca editais do backend usando Clerk
-  const { fetchWithClerk } = useClerkApi();
+  const fetchWithClerk = useClerkApi();
   const loadEditais = useCallback(async () => {
+    if (authStatus !== 'authenticated' || !clerkToken) return;
     try {
       const data = await fetchWithClerk('/api/editais')
       setEditais(data.data || [])
     } catch (err) {
       setMessage(err.message)
     }
-  }, [setMessage])
+  }, [setMessage, authStatus, clerkToken, fetchWithClerk])
 
   // Carrega editais ao montar a página
   useEffect(() => {
     loadEditais()
-  }, [loadEditais])
+  }, [loadEditais, clerkToken])
 
   // Dispara atualização manual dos editais
   const handleTriggerUpdate = async () => {
@@ -131,12 +129,12 @@ const EditaisPage = () => {
             <span>Valor estimado</span>
           </TableHead>
           {filteredEditais.map((edital, index) => {
-            const chave = getEditalKey(edital)
+            const id_c_pncp = edital?.ID_C_PNCP
             const objeto = getEditalObjeto(edital)
             const cnpj = formatCNPJ(getEditalCnpj(edital))
             const razaoSocial = getEditalRazaoSocial(edital)
             const valorEstimado = edital?.valorTotalEstimado
-            const key = chave || edital.id || edital.numero || index
+            const key = id_c_pncp || edital.id || edital.numero || index
             const content = (
               <>
                 <span>{cnpj || '—'}</span>
@@ -145,10 +143,10 @@ const EditaisPage = () => {
                 <span>{formatCurrencyBRL(valorEstimado)}</span>
               </>
             )
-            if (chave) {
+            if (id_c_pncp) {
               return (
                 <TableRow key={key} className="table__row--link">
-                  <Link to={`/edital/${chave}`} style={{ display: 'contents', color: 'inherit', textDecoration: 'none' }}>
+                  <Link to={`/edital/${id_c_pncp}`} style={{ display: 'contents', color: 'inherit', textDecoration: 'none' }}>
                     {content}
                   </Link>
                 </TableRow>

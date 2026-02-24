@@ -1,31 +1,29 @@
-import { useAuth as useClerkAuth } from '@clerk/react-router';
+import { useCallback } from 'react';
+import { useAuth } from '../App';
 
 // Hook customizado para requisições autenticadas com Clerk.
 // Retorna a função fetchWithClerk, que faz fetch incluindo o JWT do usuário Clerk no header Authorization.
 // Útil para acessar endpoints protegidos no backend.
 export function useClerkApi() {
-  const { getToken, isSignedIn } = useClerkAuth();
+  const { clerkToken } = useAuth();
 
-  // Função para fazer fetch autenticado usando o JWT do Clerk
-  const fetchWithClerk = async (url, options = {}) => {
-    console.log('[Clerk] isSignedIn:', isSignedIn);
-    // Tenta obter o token com template (default)
-    let token = await getToken({ template: 'default' });
-    if (!token) {
-      token = await getToken();
-    }
-    console.log('[Clerk] JWT obtido:', token);
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    // Memoiza a função para garantir referência estável
+    const fetchWithClerk = useCallback(
+      async (url, options = {}) => {
+        if (!clerkToken) throw new Error('Usuário não autenticado');
+        const res = await fetch(url, {
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!res.ok) throw new Error('Erro na requisição');
+        return res.json();
       },
-    });
-    if (!res.ok) throw new Error('Erro na requisição');
-    return res.json();
-  };
+      [clerkToken]
+    );
 
-  return { fetchWithClerk };
+    return fetchWithClerk;
 }

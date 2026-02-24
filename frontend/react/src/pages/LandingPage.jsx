@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '@clerk/react-router';
+import { useAuth } from '../App';
 import { useNavigate } from 'react-router-dom';
 
 // Página inicial do sistema.
@@ -10,14 +10,13 @@ const clerkSignInUrl = import.meta.env.VITE_CLERK_SIGNIN_URL;
 const clerkSignUpUrl = import.meta.env.VITE_CLERK_SIGNUP_URL;
 
 const LandingPage = () => {
-  const { isSignedIn } = useAuth();
+  const { authStatus } = useAuth();
   const navigate = useNavigate();
   React.useEffect(() => {
-    console.log('[LandingPage] isSignedIn:', isSignedIn);
-    if (isSignedIn) {
+    if (authStatus === 'authenticated') {
       navigate('/editais');
     }
-  }, [isSignedIn, navigate]);
+  }, [authStatus, navigate]);
   return (
     <div className="grid">
       <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', maxWidth: '1024px', margin: '2rem auto', padding: '1rem 1.2rem' }}>

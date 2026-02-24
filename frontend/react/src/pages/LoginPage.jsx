@@ -3,13 +3,12 @@
 // Exibe o componente de autenticação Clerk e, ao autenticar, registra o usuário e redireciona para editais.
 const LoginPage = () => {
   const { fetchWithClerk } = useClerkApi();
-  const { isSignedIn } = useAuth();
+  const { authStatus } = useAuth();
   const navigate = useNavigate();
 
   // Efeito: ao autenticar, registra usuário Clerk no backend e redireciona
   React.useEffect(() => {
-    console.log('[LoginPage] isSignedIn:', isSignedIn);
-    if (isSignedIn) {
+    if (authStatus === 'authenticated') {
       fetchWithClerk('/api/register-clerk-user', { method: 'POST' })
         .then(res => {
           console.log('Usuário Clerk registrado:', res);
@@ -19,7 +18,7 @@ const LoginPage = () => {
         });
       navigate('/editais');
     }
-  }, [isSignedIn, navigate, fetchWithClerk]);
+  }, [authStatus, navigate, fetchWithClerk]);
 
   return (
     <div className="grid">

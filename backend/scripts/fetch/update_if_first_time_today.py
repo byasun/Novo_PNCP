@@ -9,8 +9,8 @@ import json
 from datetime import datetime
 from backend.scheduler.job import DailyJob
 from backend.storage.data_manager import DataManager
+from backend.config import DATA_DIR
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 CHECKPOINT_FILE = os.path.join(DATA_DIR, ".first_update_check.json")
 
 def already_updated_today():
@@ -44,6 +44,41 @@ def update_if_first_time_today():
     print("Primeira execução do dia, atualizando editais e itens...")
     daily_job = DailyJob()
     daily_job.run_now()
+
+    # Mesclar dados se arquivos já existirem
+    dm = DataManager()
+    editais_path = os.path.join(DATA_DIR, "editais.json")
+    itens_path = os.path.join(DATA_DIR, "itens.json")
+    # Mesclar editais
+    if os.path.exists(editais_path):
+        try:
+            with open(editais_path, "r", encoding="utf-8") as f:
+                antigos = json.load(f)
+        except Exception:
+            antigos = []
+        novos = dm.load_editais()
+        # Mescla por ID_C_PNCP
+        id_map = {str(e.get("ID_C_PNCP")): e for e in antigos if e.get("ID_C_PNCP")}
+        for edital in novos:
+            id_map[str(edital.get("ID_C_PNCP"))] = edital
+        with open(editais_path, "w", encoding="utf-8") as f:
+            json.dump(list(id_map.values()), f, ensure_ascii=False, indent=2)
+    # Mesclar itens
+    if os.path.exists(itens_path):
+        try:
+            with open(itens_path, "r", encoding="utf-8") as f:
+                antigos = json.load(f)
+        except Exception:
+            antigos = []
+        novos = dm.load_itens()
+        # Mescla por edital_ID_C_PNCP + id/numero
+        key = lambda i: (str(i.get("edital_ID_C_PNCP")), str(i.get("id") or i.get("numero") or i.get("item")))
+        item_map = {key(i): i for i in antigos if i.get("edital_ID_C_PNCP")}
+        for item in novos:
+            item_map[key(item)] = item
+        with open(itens_path, "w", encoding="utf-8") as f:
+            json.dump(list(item_map.values()), f, ensure_ascii=False, indent=2)
+
     mark_updated_today()
     print("Atualização diária concluída.")
 

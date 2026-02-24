@@ -101,6 +101,13 @@ def main():
     editais = data_manager.load_editais()
     logger.info(f"Loaded {len(editais)} editais from local storage")
 
+    # Garante que todos os itens dos editais estejam salvos
+    from backend.services.editais_service import EditaisService
+    editais_service = EditaisService()
+    logger.info("Buscando e salvando itens para todos os editais...")
+    editais_service.fetch_itens_for_all_editais(editais, skip_existing=False)
+    logger.info("Itens de todos os editais garantidos no armazenamento local.")
+
     daily_job = DailyJob()
     set_job(daily_job)
 

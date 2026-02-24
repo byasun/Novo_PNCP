@@ -6,9 +6,10 @@ Também realiza backup dos arquivos antes de sobrescrever.
 """
 import os
 import json
+import sys
 from datetime import datetime
-
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from backend.config import DATA_DIR
 EDITAIS_PATH = os.path.join(DATA_DIR, "editais.json")
 ITENS_PATH = os.path.join(DATA_DIR, "itens.json")
 BACKUP_SUFFIX = datetime.now().strftime("_%Y%m%d_%H%M%S")

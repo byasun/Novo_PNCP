@@ -23,12 +23,7 @@ if PARENT_DIR not in sys.path:
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-try:
-    from backend.config import DATA_DIR, EDITAIS_CHECKPOINT_FILE
-except ImportError:
-    # Fallback: usar valores padrão
-    DATA_DIR = os.path.join(ROOT_DIR, "data")
-    EDITAIS_CHECKPOINT_FILE = os.path.join(DATA_DIR, ".editais_checkpoint.json")
+from backend.config import DATA_DIR, EDITAIS_CHECKPOINT_FILE
 
 logging.basicConfig(
     level=logging.INFO,

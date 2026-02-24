@@ -19,7 +19,7 @@ const formatDateBR = (dateString) => {
 }
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { useClerkApi } from './hooks/useClerkApi';
+import { useAuth as useClerkAuth } from '@clerk/react-router';
 import {
   Routes,
   Route,
@@ -117,37 +117,58 @@ const AuthProvider = ({ children }) => {
   const [authStatus, setAuthStatus] = useState('loading');
   const [statusInfo, setStatusInfo] = useState(null);
   const [message, setMessage] = useState('');
-  const { fetchWithClerk } = useClerkApi();
+  const [clerkToken, setClerkToken] = useState(null);
+  const { getToken, isSignedIn } = useClerkAuth();
 
   // Atualiza status de autenticação do usuário consultando a API
   const refreshStatus = useCallback(async () => {
     try {
-      const data = await fetchWithClerk('/api/status');
-      setStatusInfo(data);
-      setAuthStatus('authenticated');
-      return true;
-    } catch (err) {
-      // Se não autenticado localmente, tenta Clerk
-      if (err.status === 401) {
-        try {
-          const clerkData = await fetchWithClerk('/api/clerk-status');
-          setStatusInfo(clerkData);
-          setAuthStatus('authenticated');
-          return true;
-        } catch (clerkErr) {
-          setAuthStatus('unauthenticated');
-          setStatusInfo(null);
-          return false;
-        }
+      // Obtém token do Clerk se estiver autenticado
+      let token = null;
+      if (isSignedIn) {
+        token = await getToken({ template: 'default' }) || await getToken();
+        setClerkToken(token);
+      } else {
+        setClerkToken(null);
       }
+      // Faz fetch autenticado se houver token
+      if (token) {
+        const res = await fetch('/api/status', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Erro na requisição');
+        setStatusInfo(data);
+        setClerkToken(token);
+        setAuthStatus('authenticated');
+        return true;
+      } else if (isSignedIn) {
+        // Está logado no Clerk mas token ainda não disponível: manter loading
+        setAuthStatus('loading');
+        setStatusInfo(null);
+        setClerkToken(null);
+        return false;
+      } else {
+        setAuthStatus('unauthenticated');
+        setStatusInfo(null);
+        setClerkToken(null);
+        return false;
+      }
+    } catch (err) {
+      setAuthStatus('unauthenticated');
+      setStatusInfo(null);
       setMessage(err.message);
       return false;
     }
-  }, [fetchWithClerk]);
+  }, [getToken, isSignedIn]);
 
+  // Atualiza status ao montar o provider
   useEffect(() => {
-    refreshStatus();
+    (async () => {
+      await refreshStatus();
+    })();
   }, [refreshStatus]);
+  // Removido: refreshStatus automático. Agora só é chamado manualmente em login/logout.
 
   const login = async (payload) => {
     await fetchJson('/login', { method: 'POST', body: JSON.stringify(payload) });
@@ -175,6 +196,7 @@ const AuthProvider = ({ children }) => {
         login,
         logout,
         createUser,
+        clerkToken,
       }}
     >
       {children}
@@ -232,15 +254,16 @@ const Layout = ({ children, onLogout }) => {
  */
 
 const RequireAuth = ({ children }) => {
-  const { authStatus } = useAuth()
+  const { authStatus } = useAuth();
   if (authStatus === 'loading') {
-    return <div className="card">Carregando...</div>
+    // Evita flickering: só mostra carregando, não redireciona
+    return <div className="card">Carregando...</div>;
   }
-  if (authStatus !== 'authenticated') {
-    return <Navigate to="/login" replace />
+  if (authStatus === 'unauthenticated') {
+    return <Navigate to="/login" replace />;
   }
-  return children
-}
+  return children;
+};
 
 /**
  * Componente principal da aplicação React.
@@ -274,7 +297,7 @@ function App() {
           }
         />
         <Route
-          path="/edital/:editalKey"
+          path="/edital/:id_c_pncp"
           element={
             <RequireAuth>
               <EditalDetailPage />

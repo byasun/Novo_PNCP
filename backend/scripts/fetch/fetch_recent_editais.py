@@ -1,3 +1,9 @@
+import sys
+import os
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 """
 Busca editais "A Receber/Recebendo Proposta" publicados ou atualizados nos últimos 15 dias.
 

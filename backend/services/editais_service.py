@@ -402,7 +402,7 @@ class EditaisService:
         return None
     
     def get_itens_by_edital(self, cnpj, ano, numero):
-        # Filtra itens vinculados a um edital (padroniza como string)
+        # Mantém método antigo para compatibilidade
         cnpj = str(cnpj) if cnpj is not None else ""
         ano = str(ano) if ano is not None else ""
         numero = str(numero) if numero is not None else ""
@@ -414,6 +414,14 @@ class EditaisService:
                 str(item.get("edital_ano", "")) == ano and
                 str(item.get("edital_numero", "")) == numero
             )
+        ]
+
+    def get_itens_by_edital_id(self, id_c_pncp):
+        # Novo método: filtra itens por edital_ID_C_PNCP
+        all_itens = self.data_manager.load_itens()
+        return [
+            item for item in all_itens
+            if str(item.get("edital_ID_C_PNCP", "")) == str(id_c_pncp)
         ]
     
     def _generate_edital_key(self, edital):

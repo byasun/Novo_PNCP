@@ -7,7 +7,10 @@ Este script garante que os campos edital_cnpj, edital_ano e edital_numero dos it
 """
 import json
 import os
-ITENS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "itens.json")
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from backend.config import DATA_DIR
+ITENS_PATH = os.path.join(DATA_DIR, "itens.json")
 
 
 def main():
