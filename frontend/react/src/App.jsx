@@ -1,4 +1,4 @@
-// Formata CNPJ para XX.XXX.XXX/XXXX-XX
+// Função utilitária para formatar CNPJ no padrão XX.XXX.XXX/XXXX-XX
 const formatCNPJ = (cnpj) => {
   if (!cnpj) return '—';
   const digits = String(cnpj).replace(/\D/g, '');
@@ -6,7 +6,7 @@ const formatCNPJ = (cnpj) => {
   return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12,14)}`;
 }
 
-// Formata datas para DD/MM/YYYY
+// Função utilitária para formatar datas no padrão brasileiro DD/MM/YYYY
 const formatDateBR = (dateString) => {
   if (!dateString) return '—';
   const date = new Date(dateString);
@@ -17,7 +17,6 @@ const formatDateBR = (dateString) => {
     year: 'numeric',
   });
 }
-
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useClerkApi } from './hooks/useClerkApi';
@@ -43,18 +42,21 @@ import Header from './components/Header'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 
+// Contexto de autenticação global da aplicação
 const AuthContext = createContext(null)
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 const normalizedBase = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE
 
+// Monta a URL base para requisições à API
 const buildUrl = (path) => {
   if (path.startsWith('http://') || path.startsWith('https://')) return path
   if (!normalizedBase) return path
   return `${normalizedBase}${path}`
 }
 
+// Função utilitária para requisições HTTP que retorna JSON e trata erros
 const fetchJson = async (path, options = {}) => {
   const res = await fetch(buildUrl(path), {
     credentials: 'include',
@@ -102,7 +104,14 @@ const formatCurrencyBRL = (value) => {
   }).format(numeric)
 }
 
+// Hook para acessar o contexto de autenticação
 const useAuth = () => useContext(AuthContext)
+
+/**
+ * Provedor de autenticação global.
+ * Gerencia status, informações e métodos de autenticação do usuário.
+ * Envolve toda a aplicação para fornecer contexto de autenticação.
+ */
 
 const AuthProvider = ({ children }) => {
   const [authStatus, setAuthStatus] = useState('loading');
@@ -110,8 +119,8 @@ const AuthProvider = ({ children }) => {
   const [message, setMessage] = useState('');
   const { fetchWithClerk } = useClerkApi();
 
+  // Atualiza status de autenticação do usuário consultando a API
   const refreshStatus = useCallback(async () => {
-    // Tenta autenticação Clerk diretamente
     try {
       const data = await fetchWithClerk('/api/status');
       setStatusInfo(data);
@@ -178,6 +187,11 @@ const AuthProvider = ({ children }) => {
   );
 };
 
+/**
+ * Componente de layout principal da aplicação.
+ * Exibe cabeçalho, barra de navegação, mensagens e conteúdo principal.
+ */
+
 const Layout = ({ children, onLogout }) => {
   const { authStatus, message, setMessage, statusInfo } = useAuth();
   const location = useLocation();
@@ -212,6 +226,11 @@ const Layout = ({ children, onLogout }) => {
   );
 };
 
+/**
+ * Componente de proteção de rota.
+ * Redireciona para login se o usuário não estiver autenticado.
+ */
+
 const RequireAuth = ({ children }) => {
   const { authStatus } = useAuth()
   if (authStatus === 'loading') {
@@ -223,10 +242,16 @@ const RequireAuth = ({ children }) => {
   return children
 }
 
+/**
+ * Componente principal da aplicação React.
+ * Gerencia rotas, autenticação e layout global.
+ */
+
 function App() {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
+  // Função para logout e redirecionamento
   const handleLogout = async () => {
     await logout();
     navigate('/login');

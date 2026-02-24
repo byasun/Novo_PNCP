@@ -6,6 +6,8 @@ import { useAuth } from '@clerk/react-router';
 import Card from '../components/Card'
 
 const EditalDetailPage = () => {
+  // Página de detalhes de um edital específico.
+  // Busca os dados do edital pelo id na URL e exibe informações detalhadas.
   const { editalKey } = useParams();
   const { setMessage, isSignedIn } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const EditalDetailPage = () => {
   const [itens, setItens] = useState([]);
 
   useEffect(() => {
+    // Verifica se o usuário está autenticado, caso contrário redireciona para a página de login.
     if (!isSignedIn) {
       navigate('/login');
     }

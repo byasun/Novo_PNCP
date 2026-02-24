@@ -1,4 +1,7 @@
-import React, { useEffect } from 'react';
+
+// Página de callback para autenticação SSO.
+// Aguarda autenticação do Clerk e redireciona para editais se autenticado.
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/react-router';
 
@@ -6,6 +9,7 @@ const SsoCallbackPage = () => {
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useAuth();
 
+  // Efeito: ao autenticar via SSO, redireciona para editais
   React.useEffect(() => {
     if (!isLoaded) return;
     if (isSignedIn) {

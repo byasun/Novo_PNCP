@@ -1,14 +1,12 @@
-import React from 'react';
-import { SignIn } from '@clerk/clerk-react';
-import { useClerkApi } from '../hooks/useClerkApi';
-import { useAuth } from '@clerk/react-router';
-import { useNavigate } from 'react-router-dom';
 
+// Página de login do sistema.
+// Exibe o componente de autenticação Clerk e, ao autenticar, registra o usuário e redireciona para editais.
 const LoginPage = () => {
   const { fetchWithClerk } = useClerkApi();
   const { isSignedIn } = useAuth();
   const navigate = useNavigate();
 
+  // Efeito: ao autenticar, registra usuário Clerk no backend e redireciona
   React.useEffect(() => {
     console.log('[LoginPage] isSignedIn:', isSignedIn);
     if (isSignedIn) {

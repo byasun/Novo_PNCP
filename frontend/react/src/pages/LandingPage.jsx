@@ -2,6 +2,10 @@ import React from 'react';
 import { useAuth } from '@clerk/react-router';
 import { useNavigate } from 'react-router-dom';
 
+// Página inicial do sistema.
+// Exibe mensagem de boas-vindas e link para login.
+// Utiliza o hook useAuth para verificar se o usuário está autenticado.
+// Se autenticado, redireciona para a página de editais.
 const clerkSignInUrl = import.meta.env.VITE_CLERK_SIGNIN_URL;
 const clerkSignUpUrl = import.meta.env.VITE_CLERK_SIGNUP_URL;
 

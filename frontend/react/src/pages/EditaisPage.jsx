@@ -6,10 +6,12 @@ import { useAuth } from '@clerk/react-router';
 
 import { Table, TableHead, TableRow } from '../components/Table'
 
+// Página principal de listagem de editais.
+// Exibe todos os editais disponíveis para o usuário autenticado.
+// Permite busca, atualização manual e navegação para detalhes.
 const EditaisPage = () => {
   const { isSignedIn } = useAuth();
-  console.log('Montando EditaisPage')
-  // Diagnóstico
+  // Diagnóstico de autenticação
   console.log('[EditaisPage] isSignedIn:', isSignedIn);
   const { statusInfo, refreshStatus, setMessage } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -17,30 +19,30 @@ const EditaisPage = () => {
   const [search, setSearch] = useState('')
   const navigate = useNavigate();
 
+  // Redireciona para login se não autenticado
   React.useEffect(() => {
     if (!isSignedIn) {
       navigate('/login');
     }
   }, [isSignedIn, navigate]);
 
+  // Busca editais do backend usando Clerk
   const { fetchWithClerk } = useClerkApi();
   const loadEditais = useCallback(async () => {
-    console.log('Iniciando loadEditais: antes do fetchWithClerk')
     try {
       const data = await fetchWithClerk('/api/editais')
-      console.log('Resposta do fetchWithClerk /api/editais:', data)
       setEditais(data.data || [])
     } catch (err) {
-      console.error('Erro no fetchWithClerk /api/editais:', err)
       setMessage(err.message)
     }
   }, [setMessage])
 
+  // Carrega editais ao montar a página
   useEffect(() => {
-    console.log('Chamando loadEditais')
     loadEditais()
   }, [loadEditais])
 
+  // Dispara atualização manual dos editais
   const handleTriggerUpdate = async () => {
     setLoading(true)
     setMessage('')
@@ -55,6 +57,7 @@ const EditaisPage = () => {
     }
   }
 
+  // Filtro de busca
   const filteredEditais = useMemo(() => {
     if (!search) return editais
     const term = search.toLowerCase()

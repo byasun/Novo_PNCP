@@ -1,8 +1,12 @@
 import { useAuth as useClerkAuth } from '@clerk/react-router';
 
+// Hook customizado para requisições autenticadas com Clerk.
+// Retorna a função fetchWithClerk, que faz fetch incluindo o JWT do usuário Clerk no header Authorization.
+// Útil para acessar endpoints protegidos no backend.
 export function useClerkApi() {
   const { getToken, isSignedIn } = useClerkAuth();
 
+  // Função para fazer fetch autenticado usando o JWT do Clerk
   const fetchWithClerk = async (url, options = {}) => {
     console.log('[Clerk] isSignedIn:', isSignedIn);
     // Tenta obter o token com template (default)
