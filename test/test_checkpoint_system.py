@@ -1,19 +1,18 @@
-"""Teste de integração do sistema de checkpoint de editais."""
+def simulate_checkpoint_scenario():
+
+"""
+Teste de integração do sistema de checkpoint de editais.
+Simula cenários de interrupção e retomada para garantir a segurança dos dados.
+"""
 
 #!/usr/bin/env python3
-"""
-Este script demonstra como o checkpoint garante retomada segura:
-- Se o processo parar na página 15 (checkpoint em 10)
-- O próximo run começa na página 9 (checkpoint - 1)
-- Evita perda de dados refazendo a última página salva
-"""
 
 import sys
 import os
 import json
 from pathlib import Path
 
-# Adiciona a raiz do projeto ao PATH
+# Adiciona a raiz do projeto ao PATH para facilitar imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from backend.api_client.pncp_client import PNCPClient
@@ -21,7 +20,7 @@ from backend.services.editais_service import EditaisService
 from backend.config import EDITAIS_CHECKPOINT_FILE
 import logging
 
-# Configura logging
+# Configura logging para exibir informações detalhadas durante o teste
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -29,32 +28,34 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def simulate_checkpoint_scenario():
-    """Simula interrupção e retomada do fetch."""
-    
+    """
+    Simula interrupção e retomada do fetch de editais.
+    Demonstra como o checkpoint evita perda de dados e garante retomada segura.
+    """
     logger.info("=" * 80)
     logger.info("CHECKPOINT RESUMPTION TEST")
     logger.info("=" * 80)
-    
-    # Inicializa cliente
+
+    # Inicializa cliente PNCP
     client = PNCPClient()
-    
+
     # Cenário 1: primeira execução (sem checkpoint)
     logger.info("\n[SCENARIO 1] First run - no checkpoint file")
     logger.info("-" * 80)
-    
+
     # Remove checkpoint anterior, se existir
     if os.path.exists(EDITAIS_CHECKPOINT_FILE):
         os.remove(EDITAIS_CHECKPOINT_FILE)
         logger.info(f"Removed existing checkpoint file: {EDITAIS_CHECKPOINT_FILE}")
-    
+
     last_page = client._get_last_checkpoint_page()
     logger.info(f"  Last checkpoint page: {last_page}")
-    
+
     # Simula chegar à página 15 (checkpoint salvo na 10)
     client._save_checkpoint_page(10)
     logger.info(f"  Simulating checkpoint save at page 10")
     logger.info(f"  Saved to: {EDITAIS_CHECKPOINT_FILE}")
-    
+
     with open(EDITAIS_CHECKPOINT_FILE, 'r') as f:
         checkpoint_data = json.load(f)
         logger.info(f"  Checkpoint file content: {checkpoint_data}")
