@@ -1,5 +1,8 @@
 """
 Script manual para buscar editais e itens da API PNCP conforme padrão e lógica do sistema.
+
+Este script permite buscar manualmente editais e itens da API PNCP, seguindo a lógica do sistema, com opções de padronização e logging detalhado.
+Pode ser utilizado para testes, manutenção ou coleta específica de dados.
 """
 import logging
 import os
@@ -31,9 +34,15 @@ from backend.services.editais_service import EditaisService
 from backend.storage.data_manager import DataManager
 
 def generate_edital_id(cnpj, ano, numero):
+    """
+    Gera uma string única para identificar um edital a partir de CNPJ, ano e número.
+    """
     return f"{str(cnpj)}_{str(ano)}_{str(numero)}"
 
 def padroniza_edital(edital):
+    """
+    Padroniza os campos de identificação do edital e adiciona o campo _edital_id.
+    """
     cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao", "")
     ano = edital.get("anoCompra") or edital.get("ano", "")
     numero = edital.get("numeroCompra") or edital.get("numero", "")
@@ -45,6 +54,9 @@ def padroniza_edital(edital):
     return edital
 
 def padroniza_item(item):
+    """
+    Padroniza os campos de identificação do item e adiciona o campo _edital_id.
+    """
     cnpj = item.get("edital_cnpj", "")
     ano = item.get("edital_ano", "")
     numero = item.get("edital_numero", "")

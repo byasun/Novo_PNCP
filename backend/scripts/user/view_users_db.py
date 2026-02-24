@@ -1,4 +1,9 @@
-"""Script utilitário para visualizar usuários no banco SQLite."""
+"""
+Script utilitário para visualizar usuários no banco SQLite.
+
+Este script exibe todos os usuários cadastrados no banco de dados SQLite do sistema, mostrando informações como nome, username, e-mail, status e se é admin.
+Útil para auditoria, manutenção e administração do sistema.
+"""
 
 import os
 import sqlite3
@@ -9,6 +14,9 @@ DB_PATH = PROJECT_ROOT / "data" / "users.db"
 
 
 def main() -> None:
+    """
+    Função principal que exibe todos os usuários cadastrados no banco SQLite, mostrando informações relevantes para administração.
+    """
     # Valida se o banco existe
     if not DB_PATH.exists():
         print(f"Banco não encontrado: {DB_PATH}")

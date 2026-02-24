@@ -1,4 +1,9 @@
-"""Gerenciamento de dados locais em JSON."""
+"""
+Gerenciamento de dados locais em JSON.
+
+Este módulo implementa a classe DataManager, responsável por salvar e carregar
+editais, contratos e itens em arquivos JSON no disco, garantindo persistência local.
+"""
 
 import json
 import os
@@ -8,6 +13,10 @@ from backend.config import DATA_DIR
 logger = logging.getLogger(__name__)
 
 class DataManager:
+    """
+    Classe responsável por gerenciar a persistência local de dados em arquivos JSON.
+    Permite salvar e carregar contratos, editais e itens do sistema PNCP.
+    """
     def __init__(self):
         # Diretório base de dados
         self.data_dir = DATA_DIR
@@ -17,25 +26,32 @@ class DataManager:
         self._ensure_data_dir()
     
     def _ensure_data_dir(self):
-        # Cria diretório se não existir
+        """
+        Garante que o diretório de dados exista, criando-o se necessário.
+        """
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
-            logger.info(f"Created data directory: {self.data_dir}")
+            logger.info(f"Diretório de dados criado: {self.data_dir}")
     
     def save_contratos(self, contratos):
-        # Salva contratos em disco
+        """
+        Salva a lista de contratos em disco no formato JSON.
+        """
         try:
             with open(self.contratos_file, "w", encoding="utf-8") as f:
                 json.dump(contratos, f, ensure_ascii=False, indent=2)
-            logger.info(f"Saved {len(contratos)} contratos to {self.contratos_file}")
+            logger.info(f"{len(contratos)} contratos salvos em {self.contratos_file}")
         except Exception as e:
-            logger.error(f"Error saving contratos: {e}")
+            logger.error(f"Erro ao salvar contratos: {e}")
             raise
     
     def load_contratos(self):
-        # Carrega contratos do disco
+        """
+        Carrega a lista de contratos do disco.
+        Retorna uma lista vazia se o arquivo não existir.
+        """
         if not os.path.exists(self.contratos_file):
-            logger.info("No contratos file found, returning empty list")
+            logger.info("Arquivo de contratos não encontrado, retornando lista vazia")
             return []
         
         try:

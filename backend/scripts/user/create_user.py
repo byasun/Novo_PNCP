@@ -1,8 +1,9 @@
-"""Script para criar usuários via terminal (uso administrativo).
+"""
+Script para criar usuários via terminal (uso administrativo).
 
 Uso:
     python scripts/user/create_user.py <name> <username> <email> <password>
-    
+
 Exemplo:
     python scripts/user/create_user.py "João Silva" joao.silva joao@email.com SenhaForte123!
 
@@ -12,6 +13,8 @@ A senha deve ter:
 - Pelo menos uma letra minúscula
 - Pelo menos um número
 - Pelo menos um caractere especial
+
+Este script permite a criação de usuários diretamente pelo terminal, validando a política de senha e o formato do e-mail, e evitando duplicidade de usuários.
 """
 
 import os
@@ -28,7 +31,9 @@ from backend.storage.auth_db import init_db, create_user, get_user_by_username, 
 
 
 def validate_password(password: str) -> str | None:
-    """Valida a política de senha e retorna mensagem de erro, se houver."""
+    """
+    Valida a política de senha e retorna mensagem de erro, se houver.
+    """
     if len(password) < 6:
         return "A senha deve ter no mínimo 6 caracteres."
     if not re.search(r"[A-Z]", password):
@@ -43,12 +48,17 @@ def validate_password(password: str) -> str | None:
 
 
 def validate_email(email: str) -> bool:
-    """Valida formato de email."""
+    """
+    Valida o formato do e-mail.
+    """
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return bool(re.match(email_regex, email))
 
 
 def main():
+    """
+    Função principal que executa a criação do usuário via terminal, validando dados e evitando duplicidade.
+    """
     if len(sys.argv) < 5:
         print("Uso: python scripts/user/create_user.py <name> <username> <email> <password>")
         print('Exemplo: python scripts/user/create_user.py "João Silva" joao.silva joao@email.com SenhaForte123!')

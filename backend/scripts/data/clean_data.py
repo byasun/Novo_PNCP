@@ -1,4 +1,9 @@
-"""Script para limpar dados antigos do sistema PNCP."""
+"""
+Script para limpar dados antigos do sistema PNCP.
+
+Este script realiza a limpeza dos arquivos de dados do sistema (editais, itens e checkpoint), podendo criar backups antes de remover os arquivos.
+Permite uso via linha de comando para limpar todos os dados ou apenas um tipo específico, com opção de backup.
+"""
 
 import os
 import sys
@@ -34,11 +39,9 @@ logger = logging.getLogger(__name__)
 
 def clean_editais_data(backup=True):
     """
-    Remove arquivo de editais local.
-    
+    Remove o arquivo de editais local, com opção de backup.
     Args:
         backup (bool): Se True, renomeia arquivo com timestamp ao invés de deletar
-    
     Returns:
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
@@ -71,11 +74,9 @@ def clean_editais_data(backup=True):
 
 def clean_itens_data(backup=True):
     """
-    Remove arquivo de itens local.
-    
+    Remove o arquivo de itens local, com opção de backup.
     Args:
         backup (bool): Se True, renomeia arquivo com timestamp ao invés de deletar
-    
     Returns:
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
@@ -108,11 +109,9 @@ def clean_itens_data(backup=True):
 
 def clean_checkpoint(backup=True):
     """
-    Remove arquivo de checkpoint de paginação.
-    
+    Remove o arquivo de checkpoint de paginação, com opção de backup.
     Args:
         backup (bool): Se True, renomeia arquivo com timestamp ao invés de deletar
-    
     Returns:
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
@@ -145,11 +144,9 @@ def clean_checkpoint(backup=True):
 
 def clean_all_data(backup=True):
     """
-    Remove todos os dados del sistema (editais, itens e checkpoint).
-    
+    Remove todos os dados do sistema (editais, itens e checkpoint), com opção de backup.
     Args:
         backup (bool): Se True, cria backups ao invés de deletar
-    
     Returns:
         dict: Resultados de cada limpeza
     """
@@ -179,7 +176,9 @@ def clean_all_data(backup=True):
 
 
 def print_summary(results):
-    """Exibe resumo da limpeza de forma legível."""
+    """
+    Exibe resumo da limpeza de forma legível para o usuário.
+    """
     print("\n" + "=" * 70)
     print("RESUMO DA LIMPEZA DE DADOS")
     print("=" * 70)
@@ -197,7 +196,9 @@ def print_summary(results):
 
 
 def signal_handler(signum, frame):
-    """Handler para Ctrl+C - sai graciosamente."""
+    """
+    Handler para Ctrl+C - finaliza o script de forma amigável.
+    """
     print("\n\n⚠️  Interrupção solicitada (Ctrl+C). Finalizando...")
     sys.exit(0)
 
@@ -205,9 +206,8 @@ def signal_handler(signum, frame):
 if __name__ == "__main__":
     # Registra handler para Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
-    
+    # Argumentos de linha de comando para controle de backup e tipo de limpeza
     import argparse
-    
     parser = argparse.ArgumentParser(
         description='Limpa dados antigos do sistema PNCP'
     )
@@ -222,10 +222,9 @@ if __name__ == "__main__":
         default='all',
         help='Tipo de dados a limpar (padrão: all)'
     )
-    
     args = parser.parse_args()
     backup = not args.no_backup
-    
+    # Executa a limpeza conforme o tipo solicitado
     if args.type == 'all':
         results = clean_all_data(backup=backup)
         print_summary(results)

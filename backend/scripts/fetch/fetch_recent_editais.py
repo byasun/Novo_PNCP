@@ -1,4 +1,9 @@
-"""Busca editais "A Receber/Recebendo Proposta" publicados ou atualizados nos últimos 15 dias."""
+"""
+Busca editais "A Receber/Recebendo Proposta" publicados ou atualizados nos últimos 15 dias.
+
+Este script busca editais recentes (em aberto para propostas) publicados ou atualizados nos últimos N dias, podendo também buscar os itens relacionados.
+Permite uso via linha de comando para customizar o período e se deve buscar itens.
+"""
 
 import logging
 import os

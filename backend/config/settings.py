@@ -1,6 +1,14 @@
-"""Configurações globais do sistema PNCP.
+"""
+Configurações globais do sistema PNCP.
 
-Centraliza URLs de API, parâmetros de coleta, agendamento, logging e segurança.
+Este módulo centraliza todas as configurações do sistema, incluindo:
+- URLs de APIs externas
+- Parâmetros de coleta de dados
+- Agendamento de tarefas
+- Configurações de logging
+- Segurança e variáveis de ambiente
+
+As variáveis são carregadas do arquivo .env e expostas para uso em todo o backend.
 """
 
 import os
@@ -13,28 +21,39 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 def _get_env(name: str, default: str | None = None, required: bool = False) -> str | None:
+	"""
+	Recupera o valor de uma variável de ambiente.
+	Se não existir, retorna o valor padrão ou lança erro se for obrigatória.
+	"""
 	value = os.getenv(name, default)
 	if required and not value:
-		raise RuntimeError(f"Missing required environment variable: {name}")
+		raise RuntimeError(f"Variável de ambiente obrigatória não encontrada: {name}")
 	return value
 
 
 # =============================================================================
 # FLAG DE CANCELAMENTO GLOBAL (para interrupção via Ctrl+C)
+# Utilizada para sinalizar cancelamento de operações longas (ex: coleta de dados)
 # =============================================================================
 _cancel_flag = threading.Event()
 
 def request_cancel():
-    """Sinaliza para cancelar operações em andamento (uso: Ctrl+C handler)."""
-    _cancel_flag.set()
+	"""
+	Sinaliza para cancelar operações em andamento (uso: handler de Ctrl+C).
+	"""
+	_cancel_flag.set()
 
 def reset_cancel():
-    """Reseta a flag de cancelamento (chamar no início de operações)."""
-    _cancel_flag.clear()
+	"""
+	Reseta a flag de cancelamento (chamar no início de operações longas).
+	"""
+	_cancel_flag.clear()
 
 def is_cancelled():
-    """Verifica se foi solicitado cancelamento."""
-    return _cancel_flag.is_set()
+	"""
+	Verifica se foi solicitado cancelamento global (Ctrl+C).
+	"""
+	return _cancel_flag.is_set()
 
 
 # =============================================================================

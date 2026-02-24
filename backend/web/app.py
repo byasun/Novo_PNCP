@@ -1,5 +1,11 @@
 from backend.web.clerk_auth import clerk_login_required
-"""Aplicação web Flask (API + SPA React)."""
+"""
+Aplicação web Flask (API + SPA React).
+
+Este módulo implementa a aplicação web principal do sistema PNCP,
+incluindo endpoints de API, autenticação Clerk, integração com o frontend React
+e gerenciamento de sessões de usuário.
+"""
 
 from flask import Flask, jsonify, send_file, request, send_from_directory
 from flask_cors import CORS

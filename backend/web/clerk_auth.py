@@ -1,5 +1,9 @@
-# Clerk JWT validation for Flask
-# Place this file as clerk_auth.py in backend/web/
+"""
+Autenticação Clerk JWT para Flask.
+
+Este módulo fornece funções e decorators para validar tokens JWT emitidos pelo Clerk,
+permitindo proteger rotas e identificar usuários autenticados na aplicação Flask.
+"""
 import requests
 import jwt
 from flask import request, jsonify
@@ -15,6 +19,9 @@ CLERK_AUDIENCE = _get_env("CLERK_AUDIENCE", None)
 _jwks_cache = None
 
 def get_clerk_jwks():
+    """
+    Busca e faz cache das chaves públicas JWKS do Clerk para validação de JWT.
+    """
     global _jwks_cache
     if _jwks_cache is None:
         resp = requests.get(CLERK_JWKS_URL, verify=False)
@@ -23,6 +30,10 @@ def get_clerk_jwks():
     return _jwks_cache
 
 def verify_clerk_jwt(token):
+    """
+    Valida o JWT do Clerk usando as chaves públicas JWKS.
+    Retorna o payload decodificado se válido, lança exceção caso contrário.
+    """
     jwks = get_clerk_jwks()
     unverified_header = jwt.get_unverified_header(token)
     from jwt import PyJWK

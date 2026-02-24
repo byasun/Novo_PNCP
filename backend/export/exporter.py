@@ -1,4 +1,9 @@
-"""Módulo de exportação para CSV/XLSX."""
+"""
+Módulo de exportação para CSV/XLSX.
+
+Fornece a classe Exporter, responsável por exportar dados de contratos, editais e itens
+em formatos CSV e Excel, utilizando pandas e openpyxl.
+"""
 
 import pandas as pd
 import os
@@ -11,33 +16,43 @@ from backend.storage.data_manager import DataManager
 logger = logging.getLogger(__name__)
 
 class Exporter:
+    """
+    Classe responsável por exportar dados do sistema PNCP em formatos CSV e XLSX.
+    Utiliza pandas para manipulação e exportação dos dados.
+    """
     def __init__(self):
         # Diretório de exportação configurável
         self.export_dir = EXPORT_DIR
         self._ensure_export_dir()
-    
+
     def _ensure_export_dir(self):
-        # Garante que a pasta de exportação exista
+        """
+        Garante que a pasta de exportação exista.
+        Cria o diretório caso não exista.
+        """
         if not os.path.exists(self.export_dir):
             os.makedirs(self.export_dir)
-            logger.info(f"Created export directory: {self.export_dir}")
-    
+            logger.info(f"Diretório de exportação criado: {self.export_dir}")
+
     def export_contratos(self, contratos):
-        # Exporta contratos para CSV e XLSX
+        """
+        Exporta a lista de contratos para arquivos CSV e XLSX.
+        Os arquivos são salvos no diretório de exportação configurado.
+        """
         if not contratos:
-            logger.warning("No contratos to export")
+            logger.warning("Nenhum contrato para exportar")
             return
-        
+
         try:
             df = pd.json_normalize(contratos)
-            
+
             csv_path = os.path.join(self.export_dir, "contratos.csv")
             df.to_csv(csv_path, index=False, encoding="utf-8-sig")
-            logger.info(f"Exported contratos to {csv_path}")
-            
+            logger.info(f"Contratos exportados para {csv_path}")
+
             xlsx_path = os.path.join(self.export_dir, "contratos.xlsx")
             df.to_excel(xlsx_path, index=False, engine="openpyxl")
-            logger.info(f"Exported contratos to {xlsx_path}")
+            logger.info(f"Contratos exportados para {xlsx_path}")
             
         except Exception as e:
             logger.error(f"Error exporting contratos: {e}")

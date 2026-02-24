@@ -1,4 +1,9 @@
-"""Testes unitários do DataManager (persistência JSON)."""
+"""
+Testes unitários do DataManager (persistência JSON).
+
+Este módulo testa as operações de salvar, carregar e manipular arquivos JSON
+usando a classe DataManager, garantindo persistência correta dos dados.
+"""
 
 import json
 from backend.storage import data_manager as dm_module

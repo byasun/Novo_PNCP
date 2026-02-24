@@ -1,6 +1,8 @@
 """
 Script utilitário para atualizar editais e itens se for o primeiro uso do dia.
 Pode ser chamado no início do main.py.
+
+Este script verifica se já houve atualização diária dos editais e itens. Caso não tenha ocorrido, executa a atualização e marca o dia como atualizado, evitando execuções duplicadas no mesmo dia.
 """
 import os
 import json
@@ -12,6 +14,9 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 CHECKPOINT_FILE = os.path.join(DATA_DIR, ".first_update_check.json")
 
 def already_updated_today():
+    """
+    Verifica se já foi feita atualização hoje, consultando o arquivo de checkpoint.
+    """
     if not os.path.exists(CHECKPOINT_FILE):
         return False
     try:
@@ -23,10 +28,16 @@ def already_updated_today():
         return False
 
 def mark_updated_today():
+    """
+    Marca a data de hoje como já atualizada no arquivo de checkpoint.
+    """
     with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
         json.dump({"last_update_date": datetime.now().strftime("%Y-%m-%d")}, f)
 
 def update_if_first_time_today():
+    """
+    Executa a atualização de editais e itens apenas se ainda não foi feita no dia.
+    """
     if already_updated_today():
         print("Já foi feita atualização hoje. Pulando...")
         return
@@ -37,4 +48,5 @@ def update_if_first_time_today():
     print("Atualização diária concluída.")
 
 if __name__ == "__main__":
+    # Permite execução direta do script
     update_if_first_time_today()

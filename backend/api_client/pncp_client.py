@@ -9,12 +9,17 @@ from backend.config import (
     RETRY_BACKOFF_MULTIPLIER, EDITAIS_CHECKPOINT_FILE, request_cancel, reset_cancel, is_cancelled
 )
 
+
+# Logger para registrar eventos e erros do cliente PNCP
 logger = logging.getLogger(__name__)
 
 class PNCPClient:
-    """Cliente HTTP para a API do PNCP.
+    """
+    Cliente HTTP para a API do PNCP.
 
-    Centraliza requisições, tratamento de erros, retry e checkpoint de paginação.
+    Este cliente centraliza as requisições para a API do PNCP, incluindo tratamento de erros,
+    tentativas automáticas com backoff exponencial, checkpoint de paginação e integração com
+    arquivos locais para persistência do progresso.
     """
     def __init__(self):
         # URLs base para endpoints de editais/contratações e itens
@@ -28,27 +33,35 @@ class PNCPClient:
         })
     
     def _get_last_checkpoint_page(self):
-        """Carrega a última página salva no checkpoint de editais."""
+        """
+        Carrega a última página salva no arquivo de checkpoint de editais.
+        Retorna 1 caso não exista checkpoint salvo.
+        """
         if os.path.exists(EDITAIS_CHECKPOINT_FILE):
             try:
                 with open(EDITAIS_CHECKPOINT_FILE, 'r') as f:
                     data = json.load(f)
                     return data.get('last_checkpoint_page', 1)
             except Exception as e:
-                logger.warning(f"Error reading checkpoint file: {e}")
+                logger.warning(f"Erro ao ler arquivo de checkpoint: {e}")
         return 1
     
     def _save_checkpoint_page(self, page):
-        """Salva a página atual no checkpoint de editais."""
+        """
+        Salva a página atual no arquivo de checkpoint de editais.
+        Permite retomar a coleta a partir do último progresso salvo.
+        """
         try:
             os.makedirs(os.path.dirname(EDITAIS_CHECKPOINT_FILE) or '.', exist_ok=True)
             with open(EDITAIS_CHECKPOINT_FILE, 'w') as f:
                 json.dump({'last_checkpoint_page': page}, f)
         except Exception as e:
-            logger.error(f"Error saving checkpoint file: {e}")
+            logger.error(f"Erro ao salvar arquivo de checkpoint: {e}")
     
     def _calculate_backoff_delay(self, attempt, base_delay=None):
-        """Calcula delay com backoff exponencial para retries."""
+        """
+        Calcula o tempo de espera (delay) usando backoff exponencial para tentativas de retry.
+        """
         if base_delay is None:
             base_delay = RETRY_DELAY
         return base_delay * (RETRY_BACKOFF_MULTIPLIER ** attempt)
@@ -56,7 +69,8 @@ class PNCPClient:
     def _handle_rate_limit(self, response, attempt):
         """
         Trata erro 429 (Too Many Requests) com backoff inteligente.
-        Respeita o header Retry-After se presente.
+        Se o servidor retornar o header Retry-After, respeita o tempo sugerido.
+        Caso contrário, utiliza backoff exponencial mais agressivo.
         """
         # Tenta obter o tempo de espera do header Retry-After
         retry_after = response.headers.get('Retry-After')
@@ -67,14 +81,16 @@ class PNCPClient:
                 return wait_time
             except ValueError:
                 pass
-        
         # Se não tiver Retry-After, usa backoff exponencial mais agressivo
         wait_time = self._calculate_backoff_delay(attempt, base_delay=RETRY_DELAY * 2)
-        logger.warning(f"Rate limited (429). Using exponential backoff: {wait_time:.1f}s")
+        logger.warning(f"Rate limited (429). Usando backoff exponencial: {wait_time:.1f}s")
         return wait_time
     
     def _make_request(self, endpoint, params=None):
-        # Requisição GET com retry, backoff exponencial e tratamento de rate limit
+        """
+        Realiza uma requisição GET com tentativas automáticas, backoff exponencial e tratamento de rate limit.
+        Retorna a resposta da API ou lança exceção após exceder o número máximo de tentativas.
+        """
         url = f"{self.base_url}{endpoint}"
         for attempt in range(MAX_RETRIES):
             try:

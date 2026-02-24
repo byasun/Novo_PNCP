@@ -1,4 +1,9 @@
-"""Força a coleta de itens para todos os editais salvos localmente."""
+"""
+Força a coleta de itens para todos os editais salvos localmente.
+
+Este script executa a busca de itens para todos os editais já presentes no armazenamento local, independentemente do status ou data.
+Útil para garantir que todos os itens estejam atualizados ou para forçar a sincronização completa.
+"""
 import logging
 import os
 import sys
@@ -32,6 +37,9 @@ import time
 
 
 def main():
+    """
+    Função principal que força a coleta de itens para todos os editais salvos localmente.
+    """
     # Cabeçalho de execução
     logger.info("=" * 70)
     logger.info("FORCING ITEM FETCH FOR ALL EDITAIS")
@@ -40,7 +48,7 @@ def main():
     data_manager = DataManager()
     editais_service = EditaisService()
     
-    # Load all editais from storage
+    # Carrega todos os editais do armazenamento local
     editais = data_manager.load_editais()
     logger.info(f"Loaded {len(editais)} editais from local storage")
     
@@ -48,7 +56,7 @@ def main():
         logger.warning("No editais found in storage. Run main.py first to fetch editais.")
         return
     
-    # Force fetch items for all editais
+    # Força a busca de itens para todos os editais
     start_time = datetime.now()
     logger.info(f"Starting item fetch at {start_time}...")
     

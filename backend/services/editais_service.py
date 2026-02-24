@@ -1,4 +1,10 @@
-"""Serviço de editais (camada de negócio e sincronização)."""
+"""
+Serviço de editais (camada de negócio e sincronização).
+
+Este módulo implementa a classe EditaisService, responsável por buscar, sincronizar e gerenciar
+os editais do PNCP, tanto via API quanto no armazenamento local.
+Inclui lógica de checkpoint, filtros e integração com DataManager.
+"""
 
 import logging
 from backend.api_client.pncp_client import PNCPClient
@@ -10,6 +16,10 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class EditaisService:
+    """
+    Serviço para gerenciamento de editais do PNCP.
+    Realiza busca, sincronização, checkpoint e persistência local dos editais.
+    """
     def __init__(self):
         # Cliente da API e gerenciador de dados locais
         self.client = PNCPClient()

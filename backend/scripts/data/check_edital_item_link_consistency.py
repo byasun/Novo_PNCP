@@ -1,6 +1,8 @@
 """
 Script para verificar se todos os itens possuem o campo edital_ID_C_PNCP e se esse campo corresponde a algum ID_C_PNCP presente em editais.json.
 Mostra estatísticas e exemplos de inconsistências, se houver.
+
+Este script é útil para garantir a integridade referencial entre itens e editais, identificando itens "órfãos" ou inconsistentes.
 """
 import os
 import sys
@@ -10,10 +12,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from backend.storage.data_manager import DataManager
 
 def main():
+    """
+    Função principal que verifica se todos os itens possuem o campo edital_ID_C_PNCP e se esse campo corresponde a algum edital existente.
+    Exibe estatísticas e exemplos de inconsistências encontradas.
+    """
     data_manager = DataManager()
     editais = data_manager.load_editais()
     itens = data_manager.load_itens()
 
+    # Conjunto de IDs válidos de editais
     ids_editais = set(e.get("ID_C_PNCP") for e in editais if e.get("ID_C_PNCP"))
     total_itens = len(itens)
     sem_id = 0
@@ -24,10 +31,12 @@ def main():
     for item in itens:
         eid = item.get("edital_ID_C_PNCP")
         if not eid:
+            # Item sem vínculo de edital
             sem_id += 1
             if len(exemplos_sem_id) < 5:
                 exemplos_sem_id.append(item)
         elif eid not in ids_editais:
+            # Item vinculado a edital inexistente
             id_inexistente += 1
             if len(exemplos_id_inexistente) < 5:
                 exemplos_id_inexistente.append(item)
@@ -45,4 +54,5 @@ def main():
             print(f"  {ex}")
 
 if __name__ == "__main__":
+    # Permite execução direta do script
     main()

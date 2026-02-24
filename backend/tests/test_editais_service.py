@@ -1,4 +1,9 @@
-"""Testes unitários do EditaisService."""
+"""
+Testes unitários do EditaisService.
+
+Este módulo contém testes para as funções internas do serviço de editais,
+verificando geração de chaves, fallback de campos e extração de mês.
+"""
 
 from backend.services.editais_service import EditaisService
 
