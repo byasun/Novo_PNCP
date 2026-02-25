@@ -31,10 +31,13 @@ def main():
     editais = data_manager.load_editais()
     itens = data_manager.load_itens()
 
+
     # Gera um UUID único para cada edital, independente dos campos
-    for edital in editais:
-        # Atribui um identificador único absoluto ao edital
-        edital["ID_C_PNCP"] = str(uuid.uuid4())
+    for i, edital in enumerate(editais):
+        id_c_pncp = str(uuid.uuid4())
+        edital["ID_C_PNCP"] = id_c_pncp
+        # Reordena para ser o primeiro campo
+        editais[i] = {"ID_C_PNCP": id_c_pncp, **{k: v for k, v in edital.items() if k != "ID_C_PNCP"}}
 
     # Cria um índice auxiliar para mapear (CNPJ, ano, numero) para todos os editais
     key_to_ids = {}
@@ -43,15 +46,16 @@ def main():
         key_to_ids.setdefault(key, []).append(edital["ID_C_PNCP"])
 
     # Propaga o ID_C_PNCP para os itens
-    for item in itens:
-        # Busca os campos necessários para criar a chave de vínculo
+    for i, item in enumerate(itens):
         cnpj = item.get("edital_cnpj") or item.get("cnpjOrgao") or item.get("cnpj")
         ano = item.get("edital_ano") or item.get("anoCompra") or item.get("ano")
         numero = item.get("edital_numero") or item.get("numeroCompra") or item.get("numero")
         key = f"{str(cnpj)}_{str(ano)}_{str(numero)}"
-        # Se houver mais de um edital para o mesmo vínculo, pega o primeiro (pode ser ajustado conforme necessidade)
         id_list = key_to_ids.get(key)
-        item["edital_ID_C_PNCP"] = id_list[0] if id_list else None
+        edital_id_c_pncp = id_list[0] if id_list else None
+        item["edital_ID_C_PNCP"] = edital_id_c_pncp
+        # Reordena para ser o primeiro campo
+        itens[i] = {"edital_ID_C_PNCP": edital_id_c_pncp, **{k: v for k, v in item.items() if k != "edital_ID_C_PNCP"}}
 
     # Salva as alterações nos arquivos de editais e itens
     data_manager.save_editais(editais)

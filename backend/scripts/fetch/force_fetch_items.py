@@ -15,10 +15,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Adiciona a pasta raiz (Novo_PNCP) ao PATH para permitir imports do projeto
-# __file__ = scripts/fetch/force_fetch_items.py -> dirname = fetch -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
-# sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
 from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR, request_cancel
 
 if not os.path.exists(LOGS_DIR):
