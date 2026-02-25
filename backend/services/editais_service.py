@@ -388,6 +388,7 @@ class EditaisService:
                         page += 1
 
             # Anota itens com chaves do edital (padroniza como string)
+            itens_ajustados = []
             for item in itens:
                 item["edital_cnpj"] = str(cnpj) if cnpj is not None else ""
                 item["edital_ano"] = str(ano) if ano is not None else ""
@@ -397,11 +398,16 @@ class EditaisService:
                     item["edital_numeroControlePNCP"] = edital.get("numeroControlePNCP")
                 if edital.get("ID_C_PNCP"):
                     item["edital_ID_C_PNCP"] = edital.get("ID_C_PNCP")
-
-            if itens:
-                logger.info(f"Completed edital {idx}/{total}: fetched {len(itens)} itens")
-            
-            return itens
+                # Garante que edital_ID_C_PNCP seja o primeiro campo se existir
+                if "edital_ID_C_PNCP" in item:
+                    novo_item = {"edital_ID_C_PNCP": item["edital_ID_C_PNCP"]}
+                    novo_item.update({k: v for k, v in item.items() if k != "edital_ID_C_PNCP"})
+                    itens_ajustados.append(novo_item)
+                else:
+                    itens_ajustados.append(item)
+            if itens_ajustados:
+                logger.info(f"Completed edital {idx}/{total}: fetched {len(itens_ajustados)} itens")
+            return itens_ajustados
 
         except Exception as e:
             logger.error(f"Error fetching itens for edital {idx}/{total}: {e}")
@@ -464,14 +470,30 @@ class EditaisService:
         return f"{cnpj}_{ano}_{numero}"
     
     def save_editais(self, editais):
-        # Persiste editais em disco
-        self.data_manager.save_editais(editais)
-        logger.info(f"Saved {len(editais)} editais to local storage")
+        # Garante que ID_C_PNCP seja o primeiro campo de cada edital
+        editais_ajustados = []
+        for edital in editais:
+            if "ID_C_PNCP" in edital:
+                novo_edital = {"ID_C_PNCP": edital["ID_C_PNCP"]}
+                novo_edital.update({k: v for k, v in edital.items() if k != "ID_C_PNCP"})
+                editais_ajustados.append(novo_edital)
+            else:
+                editais_ajustados.append(edital)
+        self.data_manager.save_editais(editais_ajustados)
+        logger.info(f"Saved {len(editais_ajustados)} editais to local storage")
     
     def save_itens(self, itens):
-        # Persiste itens em disco
-        self.data_manager.save_itens(itens)
-        logger.info(f"Saved {len(itens)} itens to local storage")
+        # Garante que edital_ID_C_PNCP seja o primeiro campo de cada item, se existir
+        itens_ajustados = []
+        for item in itens:
+            if "edital_ID_C_PNCP" in item:
+                novo_item = {"edital_ID_C_PNCP": item["edital_ID_C_PNCP"]}
+                novo_item.update({k: v for k, v in item.items() if k != "edital_ID_C_PNCP"})
+                itens_ajustados.append(novo_item)
+            else:
+                itens_ajustados.append(item)
+        self.data_manager.save_itens(itens_ajustados)
+        logger.info(f"Saved {len(itens_ajustados)} itens to local storage")
     
     def update_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6):
         # Atualiza editais preservando histórico local
