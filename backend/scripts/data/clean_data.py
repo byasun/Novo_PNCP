@@ -41,16 +41,18 @@ def clean_editais_data(backup=True):
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
     editais_file = os.path.join(DATA_DIR, 'editais.json')
-    
+    backup_dir = os.path.join(DATA_DIR, 'backup_editais')
+    os.makedirs(backup_dir, exist_ok=True)
+
     if not os.path.exists(editais_file):
         msg = f"Arquivo de editais não encontrado: {editais_file}"
         logger.info(msg)
         return {'success': True, 'file_path': editais_file, 'message': msg}
-    
+
     try:
         if backup:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(DATA_DIR, f'editais_backup_{timestamp}.json')
+            backup_file = os.path.join(backup_dir, f'editais.json_{timestamp}')
             os.rename(editais_file, backup_file)
             msg = f"Arquivo de editais movido para backup: {backup_file}"
             logger.info(msg)
@@ -60,7 +62,7 @@ def clean_editais_data(backup=True):
             msg = f"Arquivo de editais deletado: {editais_file}"
             logger.info(msg)
             return {'success': True, 'file_path': editais_file, 'message': msg}
-    
+
     except Exception as e:
         msg = f"Erro ao limpar editais: {e}"
         logger.error(msg)
@@ -76,16 +78,18 @@ def clean_itens_data(backup=True):
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
     itens_file = os.path.join(DATA_DIR, 'itens.json')
-    
+    backup_dir = os.path.join(DATA_DIR, 'backup_itens')
+    os.makedirs(backup_dir, exist_ok=True)
+
     if not os.path.exists(itens_file):
         msg = f"Arquivo de itens não encontrado: {itens_file}"
         logger.info(msg)
         return {'success': True, 'file_path': itens_file, 'message': msg}
-    
+
     try:
         if backup:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(DATA_DIR, f'itens_backup_{timestamp}.json')
+            backup_file = os.path.join(backup_dir, f'itens.json_{timestamp}')
             os.rename(itens_file, backup_file)
             msg = f"Arquivo de itens movido para backup: {backup_file}"
             logger.info(msg)
@@ -95,7 +99,7 @@ def clean_itens_data(backup=True):
             msg = f"Arquivo de itens deletado: {itens_file}"
             logger.info(msg)
             return {'success': True, 'file_path': itens_file, 'message': msg}
-    
+
     except Exception as e:
         msg = f"Erro ao limpar itens: {e}"
         logger.error(msg)
