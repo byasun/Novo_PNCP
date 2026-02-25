@@ -8,7 +8,13 @@ import os
 import json
 import sys
 from datetime import datetime
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+#sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.config import DATA_DIR
 EDITAIS_PATH = os.path.join(DATA_DIR, "editais.json")
 ITENS_PATH = os.path.join(DATA_DIR, "itens.json")
@@ -50,17 +56,21 @@ def main():
     itens = load_json(ITENS_PATH)
 
     # Filtra editais que ainda não encerraram
+
     editais_ativos = []
     chaves_ativos = set()
     for edital in editais:
         data_enc = edital.get("dataEncerramentoProposta")
+        # Identificador único preferencial
+        chave = (
+            edital.get("numeroControlePNCP")
+            or edital.get("ID_C_PNCP")
+            or f"{edital.get('orgaoEntidade', {}).get('cnpj') or edital.get('cnpjOrgao')}_{edital.get('anoCompra') or edital.get('ano')}_{edital.get('numeroCompra') or edital.get('numero')}"
+        )
         if not data_enc:
             # Se não tem data, mantém por segurança
             editais_ativos.append(edital)
-            cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao")
-            ano = edital.get("anoCompra") or edital.get("ano")
-            numero = edital.get("numeroCompra") or edital.get("numero")
-            chaves_ativos.add(f"{str(cnpj)}_{str(ano)}_{str(numero)}")
+            chaves_ativos.add(chave)
             continue
         try:
             dt = datetime.fromisoformat(data_enc)
@@ -71,21 +81,21 @@ def main():
             except Exception:
                 # Se não conseguir converter, mantém edital por segurança
                 editais_ativos.append(edital)
-                cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao")
-                ano = edital.get("anoCompra") or edital.get("ano")
-                numero = edital.get("numeroCompra") or edital.get("numero")
-                chaves_ativos.add(f"{str(cnpj)}_{str(ano)}_{str(numero)}")
+                chaves_ativos.add(chave)
                 continue
         if dt >= now:
             # Edital ainda está ativo
             editais_ativos.append(edital)
-            cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao")
-            ano = edital.get("anoCompra") or edital.get("ano")
-            numero = edital.get("numeroCompra") or edital.get("numero")
-            chaves_ativos.add(f"{str(cnpj)}_{str(ano)}_{str(numero)}")
+            chaves_ativos.add(chave)
 
     # Filtra itens dos editais ativos
-    itens_ativos = [item for item in itens if f"{str(item.get('edital_cnpj'))}_{str(item.get('edital_ano'))}_{str(item.get('edital_numero'))}" in chaves_ativos]
+    def item_chave(item):
+        return (
+            item.get("edital_numeroControlePNCP")
+            or item.get("edital_ID_C_PNCP")
+            or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
+        )
+    itens_ativos = [item for item in itens if item_chave(item) in chaves_ativos]
 
     # Backup antes de sobrescrever
     backup_file(EDITAIS_PATH)

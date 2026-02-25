@@ -8,38 +8,49 @@ import os
 import sys
 import json
 
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 # Adiciona a pasta raiz ao sys.path para permitir imports absolutos
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+#sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from backend.storage.data_manager import DataManager
 
-def generate_edital_id(cnpj, ano, numero):
+
+def generate_edital_id(edital):
     """
-    Gera uma string única para identificar um edital a partir de CNPJ, ano e número.
+    Gera um identificador único para o edital, preferencialmente usando numeroControlePNCP ou ID_C_PNCP.
     """
+    if edital.get("numeroControlePNCP"):
+        return edital["numeroControlePNCP"]
+    if edital.get("ID_C_PNCP"):
+        return edital["ID_C_PNCP"]
+    cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao") or edital.get("cnpj")
+    ano = edital.get("anoCompra") or edital.get("ano")
+    numero = edital.get("numeroCompra") or edital.get("numero")
     return f"{str(cnpj)}_{str(ano)}_{str(numero)}"
+
 
 def padroniza_edital_id(edital):
     """
     Adiciona o campo _edital_id ao edital, garantindo que seja o primeiro campo.
     """
-    cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao") or edital.get("cnpj")
-    ano = edital.get("anoCompra") or edital.get("ano")
-    numero = edital.get("numeroCompra") or edital.get("numero")
-    edital_id = generate_edital_id(cnpj, ano, numero)
-    # Garante que _edital_id é o primeiro campo
+    edital_id = generate_edital_id(edital)
     new_edital = {"_edital_id": edital_id}
     new_edital.update(edital)
     return new_edital
+
 
 def padroniza_item_id(item):
     """
     Adiciona o campo _edital_id ao item, garantindo que seja o primeiro campo.
     """
-    cnpj = item.get("edital_cnpj") or item.get("cnpjOrgao") or item.get("cnpj")
-    ano = item.get("edital_ano") or item.get("anoCompra") or item.get("ano")
-    numero = item.get("edital_numero") or item.get("numeroCompra") or item.get("numero")
-    edital_id = generate_edital_id(cnpj, ano, numero)
-    # Garante que _edital_id é o primeiro campo
+    edital_id = (
+        item.get("edital_numeroControlePNCP")
+        or item.get("edital_ID_C_PNCP")
+        or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
+    )
     new_item = {"_edital_id": edital_id}
     new_item.update(item)
     return new_item

@@ -77,7 +77,8 @@ def main():
         if all_itens:
             logger.info(f"\nSample items (first 5):")
             for i, item in enumerate(all_itens[:5], start=1):
-                logger.info(f"  {i}. {item.get('descricao', 'N/A')[:60]}... (edital: {item.get('edital_cnpj')}/{item.get('edital_ano')}/{item.get('edital_numero')})")
+                identificador = item.get('edital_numeroControlePNCP') or item.get('edital_ID_C_PNCP') or f"{item.get('edital_cnpj')}/{item.get('edital_ano')}/{item.get('edital_numero')}"
+                logger.info(f"  {i}. {item.get('descricao', 'N/A')[:60]}... (edital: {identificador})")
         
     except Exception as e:
         logger.exception(f"Error during item fetch: {e}")

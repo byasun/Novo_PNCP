@@ -37,11 +37,20 @@ logger = logging.getLogger(__name__)
 from backend.services.editais_service import EditaisService
 from backend.storage.data_manager import DataManager
 
-def generate_edital_id(cnpj, ano, numero):
+
+def generate_edital_id(edital):
     """
-    Gera uma string única para identificar um edital a partir de CNPJ, ano e número.
+    Gera um identificador único para o edital, preferencialmente usando numeroControlePNCP ou ID_C_PNCP.
     """
+    if edital.get("numeroControlePNCP"):
+        return edital["numeroControlePNCP"]
+    if edital.get("ID_C_PNCP"):
+        return edital["ID_C_PNCP"]
+    cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao", "")
+    ano = edital.get("anoCompra") or edital.get("ano", "")
+    numero = edital.get("numeroCompra") or edital.get("numero", "")
     return f"{str(cnpj)}_{str(ano)}_{str(numero)}"
+
 
 def padroniza_edital(edital):
     """
@@ -50,25 +59,35 @@ def padroniza_edital(edital):
     cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao", "")
     ano = edital.get("anoCompra") or edital.get("ano", "")
     numero = edital.get("numeroCompra") or edital.get("numero", "")
-    edital_id = generate_edital_id(cnpj, ano, numero)
+    edital_id = generate_edital_id(edital)
     edital["_edital_id"] = edital_id
     edital["cnpj"] = str(cnpj)
     edital["ano"] = str(ano)
     edital["numero"] = str(numero)
+    if edital.get("numeroControlePNCP"):
+        edital["numeroControlePNCP"] = edital["numeroControlePNCP"]
+    if edital.get("ID_C_PNCP"):
+        edital["ID_C_PNCP"] = edital["ID_C_PNCP"]
     return edital
+
 
 def padroniza_item(item):
     """
     Padroniza os campos de identificação do item e adiciona o campo _edital_id.
     """
-    cnpj = item.get("edital_cnpj", "")
-    ano = item.get("edital_ano", "")
-    numero = item.get("edital_numero", "")
-    edital_id = generate_edital_id(cnpj, ano, numero)
+    edital_id = (
+        item.get("edital_numeroControlePNCP")
+        or item.get("edital_ID_C_PNCP")
+        or f"{item.get('edital_cnpj', '')}_{item.get('edital_ano', '')}_{item.get('edital_numero', '')}"
+    )
     item["_edital_id"] = edital_id
-    item["edital_cnpj"] = str(cnpj)
-    item["edital_ano"] = str(ano)
-    item["edital_numero"] = str(numero)
+    if item.get("edital_numeroControlePNCP"):
+        item["edital_numeroControlePNCP"] = item["edital_numeroControlePNCP"]
+    if item.get("edital_ID_C_PNCP"):
+        item["edital_ID_C_PNCP"] = item["edital_ID_C_PNCP"]
+    item["edital_cnpj"] = str(item.get("edital_cnpj", ""))
+    item["edital_ano"] = str(item.get("edital_ano", ""))
+    item["edital_numero"] = str(item.get("edital_numero", ""))
     return item
 
 def main(days=15, fetch_items=True):
@@ -132,7 +151,11 @@ def main(days=15, fetch_items=True):
                     cnpj = edital["cnpj"]
                     ano = edital["ano"]
                     numero = edital["numero"]
-                    itens = editais_service.fetch_itens_for_edital(cnpj, ano, numero)
+                    numeroControlePNCP = edital.get("numeroControlePNCP")
+                    id_c_pncp = edital.get("ID_C_PNCP")
+                    itens = editais_service.fetch_itens_for_edital(
+                        cnpj, ano, numero, numeroControlePNCP=numeroControlePNCP, id_c_pncp=id_c_pncp
+                    )
                     itens_padronizados = [padroniza_item(i.copy()) for i in itens]
                     for item in itens_padronizados:
                         chave = (item["_edital_id"], item.get("itemSequencial"))

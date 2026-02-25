@@ -7,7 +7,12 @@ import os
 import sys
 import json
 
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
+#
 # Ajusta o PYTHONPATH e o import para rodar de dentro da pasta backend ou backend/scripts
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()

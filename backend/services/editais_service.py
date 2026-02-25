@@ -219,13 +219,21 @@ class EditaisService:
         existing_itens = self.data_manager.load_itens()
         existing_keys = set()
         existing_edital_keys = set()  # Chaves de editais que já têm itens
-        
+
         for item in existing_itens:
             # Cria chave única para deduplicação de itens
-            key = f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
+            key = (
+                item.get('edital_numeroControlePNCP')
+                or item.get('edital_ID_C_PNCP')
+                or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
+            )
             existing_keys.add(key)
             # Cria chave do edital para verificar quais já foram processados
-            edital_key = f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
+            edital_key = (
+                item.get('edital_numeroControlePNCP')
+                or item.get('edital_ID_C_PNCP')
+                or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
+            )
             existing_edital_keys.add(edital_key)
         
         logger.info(f"Loaded {len(existing_itens)} existing items from storage")
@@ -236,20 +244,22 @@ class EditaisService:
             editais_to_process = []
             skipped_count = 0
             for edital in editais:
+                numero_controle = edital.get("numeroControlePNCP")
+                id_c_pncp = edital.get("ID_C_PNCP")
                 cnpj = (edital.get("orgaoEntidade", {}) or {}).get("cnpj") or edital.get("cnpjOrgao")
                 ano = edital.get("anoCompra") or edital.get("ano")
                 numero = edital.get("numeroCompra") or edital.get("numero")
-                edital_key = f"{cnpj}_{ano}_{numero}"
-                
+                edital_key = numero_controle or id_c_pncp or f"{cnpj}_{ano}_{numero}"
+
                 if edital_key in existing_edital_keys:
                     skipped_count += 1
                 else:
                     editais_to_process.append(edital)
-            
+
             logger.info(f"Skipping {skipped_count} editais that already have items saved")
             logger.info(f"Will process {len(editais_to_process)} editais without items")
             editais = editais_to_process
-            
+
             if not editais:
                 logger.info("All editais already have items saved. Nothing to fetch.")
                 return existing_itens
@@ -276,7 +286,11 @@ class EditaisService:
                     
                     # Remove duplicados (itens já conhecidos)
                     for item in itens:
-                        key = f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
+                        key = (
+                            item.get('edital_numeroControlePNCP')
+                            or item.get('edital_ID_C_PNCP')
+                            or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
+                        )
                         if key not in existing_keys:
                             all_itens.append(item)
                             existing_keys.add(key)
@@ -378,6 +392,11 @@ class EditaisService:
                 item["edital_cnpj"] = str(cnpj) if cnpj is not None else ""
                 item["edital_ano"] = str(ano) if ano is not None else ""
                 item["edital_numero"] = str(numero) if numero is not None else ""
+                # Adiciona identificadores únicos se disponíveis
+                if edital.get("numeroControlePNCP"):
+                    item["edital_numeroControlePNCP"] = edital.get("numeroControlePNCP")
+                if edital.get("ID_C_PNCP"):
+                    item["edital_ID_C_PNCP"] = edital.get("ID_C_PNCP")
 
             if itens:
                 logger.info(f"Completed edital {idx}/{total}: fetched {len(itens)} itens")
@@ -393,20 +412,29 @@ class EditaisService:
         return self.data_manager.load_editais()
     
     def get_edital_by_key(self, edital_key):
-        # Busca edital por chave composta
+        # Busca edital por identificador único (numeroControlePNCP, ID_C_PNCP ou chave composta)
         editais = self.data_manager.load_editais()
         for edital in editais:
-            key = self._generate_edital_key(edital)
+            key = (
+                edital.get("numeroControlePNCP")
+                or edital.get("ID_C_PNCP")
+                or self._generate_edital_key(edital)
+            )
             if key == edital_key:
                 return edital
         return None
     
-    def get_itens_by_edital(self, cnpj, ano, numero):
-        # Mantém método antigo para compatibilidade
+    def get_itens_by_edital(self, cnpj=None, ano=None, numero=None, numeroControlePNCP=None, id_c_pncp=None):
+        # Busca itens por qualquer identificador único ou chave composta (compatibilidade)
+        all_itens = self.data_manager.load_itens()
+        if numeroControlePNCP:
+            return [item for item in all_itens if str(item.get("edital_numeroControlePNCP", "")) == str(numeroControlePNCP)]
+        if id_c_pncp:
+            return [item for item in all_itens if str(item.get("edital_ID_C_PNCP", "")) == str(id_c_pncp)]
+        # Fallback para chave composta
         cnpj = str(cnpj) if cnpj is not None else ""
         ano = str(ano) if ano is not None else ""
         numero = str(numero) if numero is not None else ""
-        all_itens = self.data_manager.load_itens()
         return [
             item for item in all_itens
             if (
@@ -425,7 +453,11 @@ class EditaisService:
         ]
     
     def _generate_edital_key(self, edital):
-        # Gera chave única para lookup
+        # Gera chave única para lookup (preferencialmente identificadores únicos)
+        if edital.get("numeroControlePNCP"):
+            return edital.get("numeroControlePNCP")
+        if edital.get("ID_C_PNCP"):
+            return edital.get("ID_C_PNCP")
         cnpj = edital.get("orgaoEntidade", {}).get("cnpj", "") or edital.get("cnpjOrgao", "")
         ano = edital.get("anoCompra", "")
         numero = edital.get("numeroCompra", "")

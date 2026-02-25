@@ -8,15 +8,25 @@ import os
 import sys
 import uuid
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) )
+
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+#sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) )
 
 from backend.storage.data_manager import DataManager
 
+
 def generate_edital_key(edital):
     """
-    Gera uma chave única baseada em CNPJ, ano e número do edital.
-    Utilizada para mapear e relacionar editais e itens.
+    Gera uma chave única baseada em numeroControlePNCP, ID_C_PNCP ou (CNPJ, ano, numero).
     """
+    if edital.get("numeroControlePNCP"):
+        return edital["numeroControlePNCP"]
+    if edital.get("ID_C_PNCP"):
+        return edital["ID_C_PNCP"]
     cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao") or edital.get("cnpj")
     ano = edital.get("anoCompra") or edital.get("ano")
     numero = edital.get("numeroCompra") or edital.get("numero")
@@ -32,25 +42,31 @@ def main():
     itens = data_manager.load_itens()
 
 
+
     # Gera um UUID único para cada edital, independente dos campos
     for i, edital in enumerate(editais):
-        id_c_pncp = str(uuid.uuid4())
-        edital["ID_C_PNCP"] = id_c_pncp
+        if not edital.get("ID_C_PNCP"):
+            id_c_pncp = str(uuid.uuid4())
+            edital["ID_C_PNCP"] = id_c_pncp
         # Reordena para ser o primeiro campo
-        editais[i] = {"ID_C_PNCP": id_c_pncp, **{k: v for k, v in edital.items() if k != "ID_C_PNCP"}}
+        editais[i] = {"ID_C_PNCP": edital["ID_C_PNCP"], **{k: v for k, v in edital.items() if k != "ID_C_PNCP"}}
 
-    # Cria um índice auxiliar para mapear (CNPJ, ano, numero) para todos os editais
+
+    # Cria um índice auxiliar para mapear identificadores para todos os editais
     key_to_ids = {}
     for edital in editais:
         key = generate_edital_key(edital)
         key_to_ids.setdefault(key, []).append(edital["ID_C_PNCP"])
 
+
     # Propaga o ID_C_PNCP para os itens
     for i, item in enumerate(itens):
-        cnpj = item.get("edital_cnpj") or item.get("cnpjOrgao") or item.get("cnpj")
-        ano = item.get("edital_ano") or item.get("anoCompra") or item.get("ano")
-        numero = item.get("edital_numero") or item.get("numeroCompra") or item.get("numero")
-        key = f"{str(cnpj)}_{str(ano)}_{str(numero)}"
+        # Tenta identificar o edital correspondente por todos os identificadores possíveis
+        key = (
+            item.get("edital_numeroControlePNCP")
+            or item.get("edital_ID_C_PNCP")
+            or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
+        )
         id_list = key_to_ids.get(key)
         edital_id_c_pncp = id_list[0] if id_list else None
         item["edital_ID_C_PNCP"] = edital_id_c_pncp
