@@ -60,7 +60,8 @@ class DailyJob:
             # for proposal reception period, NOT the search date. Use end of 2026
             # to get ALL editais that are currently open for receiving proposals.
             data_final = "20261231"  # December 31, 2026 - includes all open editais
-            
+
+            # Busca e salva todos os editais filtrados
             self.editais_service.sync_editais(
                 data_inicial=None,  # No initial date limit - fetch ALL editais
                 data_final=data_final,      # Far future date to include all open proposals
@@ -68,7 +69,15 @@ class DailyJob:
                 filter_by_publication_date=True,  # ✅ Client-side filter: last 15 days
                 days_publication=15
             )
-            
+
+            # Após salvar todos os editais, busca e salva itens de todos os editais filtrados
+            from backend.storage.data_manager import DataManager
+            data_manager = DataManager()
+            editais = data_manager.load_editais()
+            logger.info(f"Buscando e salvando itens para {len(editais)} editais filtrados...")
+            self.editais_service.fetch_itens_for_all_editais(editais, skip_existing=False)
+            logger.info("Itens de todos os editais garantidos no armazenamento local.")
+
             self.last_run = datetime.now()
             logger.info(f"Daily update completed at {self.last_run}")
             

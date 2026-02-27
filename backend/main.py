@@ -77,12 +77,8 @@ def main():
     app.config["SECRET_KEY"] = runtime_secret
     logger.info("New session secret generated (previous sessions invalidated)")
 
-    # 1. Limpa editais/itens expirados
-    try:
-        from backend.scripts.data.remove_expired_editais import main as remove_expired_editais
-        remove_expired_editais()
-    except Exception as e:
-        logger.warning(f"Falha ao executar limpeza de editais/itens expirados: {e}")
+    # 1. (Removido) Limpeza automática de editais/itens expirados
+    # (A remoção automática foi desativada para evitar perda de dados)
 
     # 2. Verifica se é a primeira inicialização do dia
     try:

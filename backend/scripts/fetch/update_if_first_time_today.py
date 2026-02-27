@@ -58,11 +58,11 @@ def update_if_first_time_today():
             antigos = []
         novos = dm.load_editais()
         # Mescla por ID_C_PNCP
-        id_map = {str(e.get("ID_C_PNCP")): e for e in antigos if e.get("ID_C_PNCP")}
-        for edital in novos:
-            id_map[str(edital.get("ID_C_PNCP"))] = edital
-        with open(editais_path, "w", encoding="utf-8") as f:
-            json.dump(list(id_map.values()), f, ensure_ascii=False, indent=2)
+            editais_dict = {e.get("ID_C_PNCP"): e for e in antigos if e.get("ID_C_PNCP")}
+            for e in novos:
+                if e.get("ID_C_PNCP"):
+                    editais_dict[e["ID_C_PNCP"]] = e
+            dm.save_editais(list(editais_dict.values()))
     # Mesclar itens
     if os.path.exists(itens_path):
         try:
