@@ -57,12 +57,16 @@ def update_if_first_time_today():
         except Exception:
             antigos = []
         novos = dm.load_editais()
-        # Mescla por ID_C_PNCP
-            editais_dict = {e.get("ID_C_PNCP"): e for e in antigos if e.get("ID_C_PNCP")}
-            for e in novos:
-                if e.get("ID_C_PNCP"):
-                    editais_dict[e["ID_C_PNCP"]] = e
+        # Mescla por ID_C_PNCP: sempre mantém todos os antigos e só adiciona/atualiza os novos
+        editais_dict = {e.get("ID_C_PNCP"): e for e in antigos if e.get("ID_C_PNCP")}
+        for e in novos:
+            if e.get("ID_C_PNCP"):
+                editais_dict[e["ID_C_PNCP"]] = e
+        # Só salva se houver pelo menos 1 edital (antigo ou novo)
+        if editais_dict:
             dm.save_editais(list(editais_dict.values()))
+        else:
+            print("Nenhum edital encontrado (nem antigo nem novo). Mantendo arquivo antigo.")
     # Mesclar itens
     if os.path.exists(itens_path):
         try:
@@ -71,13 +75,17 @@ def update_if_first_time_today():
         except Exception:
             antigos = []
         novos = dm.load_itens()
-        # Mescla por edital_ID_C_PNCP + id/numero
+        # Mescla por edital_ID_C_PNCP + id/numero: sempre mantém todos os antigos e só adiciona/atualiza os novos
         key = lambda i: (str(i.get("edital_ID_C_PNCP")), str(i.get("id") or i.get("numero") or i.get("item")))
         item_map = {key(i): i for i in antigos if i.get("edital_ID_C_PNCP")}
         for item in novos:
             item_map[key(item)] = item
-        with open(itens_path, "w", encoding="utf-8") as f:
-            json.dump(list(item_map.values()), f, ensure_ascii=False, indent=2)
+        # Só salva se houver pelo menos 1 item (antigo ou novo)
+        if item_map:
+            with open(itens_path, "w", encoding="utf-8") as f:
+                json.dump(list(item_map.values()), f, ensure_ascii=False, indent=2)
+        else:
+            print("Nenhum item encontrado (nem antigo nem novo). Mantendo arquivo antigo.")
 
     mark_updated_today()
     print("Atualização diária concluída.")

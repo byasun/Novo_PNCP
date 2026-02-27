@@ -5,7 +5,7 @@ import json
 # Adiciona a pasta raiz ao sys.path para garantir imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
 EDITAIS_PATH = os.path.join(DATA_DIR, 'editais.json')
 ITENS_PATH = os.path.join(DATA_DIR, 'itens.json')
 

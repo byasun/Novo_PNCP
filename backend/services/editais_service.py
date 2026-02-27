@@ -237,25 +237,20 @@ class EditaisService:
             logger.warning("Operação de busca de itens cancelada antes de iniciar.")
             return []
 
-        # Carrega itens existentes para evitar duplicidades
+        # Carrega itens existentes para evitar duplicidades apenas de editais (não de itens)
         existing_itens = self.data_manager.load_itens()
-        existing_keys = set()
-        existing_edital_keys = set()  # IDs oficiais de editais que já têm itens
-
+        existing_edital_keys = set()
         for item in existing_itens:
-            # Cria chave única para deduplicação de itens (considera ambos IDs)
             numero = item.get('edital_numeroControlePNCP')
             uuid = item.get('edital_ID_C_PNCP')
             if numero:
-                existing_keys.add(numero)
                 existing_edital_keys.add(numero)
             if uuid:
-                existing_keys.add(uuid)
                 existing_edital_keys.add(uuid)
-        
+
         logger.info(f"Loaded {len(existing_itens)} existing items from storage")
         logger.info(f"Found {len(existing_edital_keys)} editais with items already saved")
-        
+
         # Filtra editais que já têm itens salvos (se skip_existing=True)
         if skip_existing and existing_edital_keys:
             editais_to_process = []
@@ -276,12 +271,12 @@ class EditaisService:
             if not editais:
                 logger.info("All editais already have items saved. Nothing to fetch.")
                 return existing_itens
-        
+
         logger.info(f"Fetching items for {len(editais)} editais using {ITEMS_FETCH_THREADS} parallel threads...")
-        
+
         all_itens = existing_itens.copy()  # Start with existing items
         processed_count = 0
-        
+
         # Usa ThreadPoolExecutor para paralelizar a coleta
         executor = None
         try:
@@ -302,18 +297,8 @@ class EditaisService:
                     break
                 try:
                     itens = future.result()
-                    # Remove duplicados (itens já conhecidos) usando apenas IDs oficiais
-                    for item in itens:
-                        numero = item.get('edital_numeroControlePNCP')
-                        uuid = item.get('edital_ID_C_PNCP')
-                        added = False
-                        if numero and numero not in existing_keys:
-                            all_itens.append(item)
-                            existing_keys.add(numero)
-                            added = True
-                        if uuid and uuid not in existing_keys and not added:
-                            all_itens.append(item)
-                            existing_keys.add(uuid)
+                    # Adiciona todos os itens, sem deduplicação
+                    all_itens.extend(itens)
                     processed_count += 1
                     # Salva checkpoint a cada N editais
                     if processed_count % ITEMS_FETCH_CHECKPOINT == 0:
@@ -471,15 +456,15 @@ class EditaisService:
         ]
     
     def save_editais(self, editais):
-        # Garante que ID_C_PNCP seja o primeiro campo de cada edital
+        # Garante que ID_C_PNCP seja o primeiro campo de cada edital e sempre exista
+        import uuid
         editais_ajustados = []
         for edital in editais:
-            if "ID_C_PNCP" in edital:
-                novo_edital = {"ID_C_PNCP": edital["ID_C_PNCP"]}
-                novo_edital.update({k: v for k, v in edital.items() if k != "ID_C_PNCP"})
-                editais_ajustados.append(novo_edital)
-            else:
-                editais_ajustados.append(edital)
+            if not edital.get("ID_C_PNCP") or not isinstance(edital.get("ID_C_PNCP"), str) or not edital["ID_C_PNCP"].strip():
+                edital["ID_C_PNCP"] = str(uuid.uuid4())
+            novo_edital = {"ID_C_PNCP": edital["ID_C_PNCP"]}
+            novo_edital.update({k: v for k, v in edital.items() if k != "ID_C_PNCP"})
+            editais_ajustados.append(novo_edital)
         self.data_manager.save_editais(editais_ajustados)
         logger.info(f"Saved {len(editais_ajustados)} editais to local storage")
     

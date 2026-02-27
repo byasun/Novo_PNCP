@@ -9,7 +9,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 # Caminho para o arquivo de editais
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
+#DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
 EDITAIS_PATH = os.path.join(DATA_DIR, 'editais.json')
 
 def main():

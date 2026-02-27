@@ -101,7 +101,7 @@ def main():
     from backend.services.editais_service import EditaisService
     editais_service = EditaisService()
     logger.info("Buscando e salvando itens para todos os editais...")
-    editais_service.fetch_itens_for_all_editais(editais, skip_existing=False)
+    editais_service.fetch_itens_for_all_editais(editais, skip_existing=True)
     logger.info("Itens de todos os editais garantidos no armazenamento local.")
 
     daily_job = DailyJob()
