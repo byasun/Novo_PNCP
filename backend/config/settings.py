@@ -35,6 +35,7 @@ def _get_env(name: str, default: str | None = None, required: bool = False) -> s
 # FLAG DE CANCELAMENTO GLOBAL (para interrupção via Ctrl+C)
 # Utilizada para sinalizar cancelamento de operações longas (ex: coleta de dados)
 # =============================================================================
+
 _cancel_flag = threading.Event()
 
 def request_cancel():
@@ -73,8 +74,8 @@ RETRY_DELAY = float(_get_env("RETRY_DELAY", "5"))  # Delay inicial entre tentati
 RETRY_BACKOFF_MULTIPLIER = float(_get_env("RETRY_BACKOFF_MULTIPLIER", "2.0"))  # Multiplicador exponencial para backoff
 
 # Configuração de busca paralela de itens (configuráveis via .env)
-ITEMS_FETCH_THREADS = int(_get_env("ITEMS_FETCH_THREADS", "3"))  # Número de threads paralelas (reduza se tiver muitos 429)
-ITEMS_FETCH_DELAY_PER_THREAD = float(_get_env("ITEMS_FETCH_DELAY", "0.5"))  # Delay por thread para evitar rate limit
+ITEMS_FETCH_THREADS = int(_get_env("ITEMS_FETCH_THREADS"))  # Número de threads paralelas (reduza se tiver muitos 429)
+ITEMS_FETCH_DELAY_PER_THREAD = float(_get_env("ITEMS_FETCH_DELAY"))  # Delay por thread para evitar rate limit
 ITEMS_FETCH_CHECKPOINT = 100  # Salvar progresso a cada N editais
 ITEMS_SKIP_EXISTING = _get_env("ITEMS_SKIP_EXISTING", "true").lower() in ("true", "1", "yes")  # Pular editais com itens já salvos
 
