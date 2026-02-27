@@ -93,4 +93,4 @@ dist-ssr
 *.sw?
 
 docs/
-*/.pytest_cache
+.pytest_cache
