@@ -38,12 +38,15 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def backup_file(path):
+def backup_file(path, backup_dir):
     """
-    Realiza backup do arquivo adicionando sufixo com data/hora.
+    Realiza backup do arquivo em um diretório específico, adicionando sufixo com data/hora.
     """
     if os.path.exists(path):
-        os.rename(path, path + BACKUP_SUFFIX)
+        os.makedirs(backup_dir, exist_ok=True)
+        base = os.path.basename(path)
+        backup_path = os.path.join(backup_dir, f"{base}{BACKUP_SUFFIX}")
+        os.rename(path, backup_path)
 
 def main():
     """
@@ -98,8 +101,8 @@ def main():
     itens_ativos = [item for item in itens if item_chave(item) in chaves_ativos]
 
     # Backup antes de sobrescrever
-    backup_file(EDITAIS_PATH)
-    backup_file(ITENS_PATH)
+    backup_file(EDITAIS_PATH, os.path.join(DATA_DIR, 'backup_editais'))
+    backup_file(ITENS_PATH, os.path.join(DATA_DIR, 'backup_itens'))
     save_json(EDITAIS_PATH, editais_ativos)
     save_json(ITENS_PATH, itens_ativos)
     print(f"Editais e itens expirados removidos. {len(editais_ativos)} editais e {len(itens_ativos)} itens restantes.")

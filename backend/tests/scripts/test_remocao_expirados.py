@@ -5,7 +5,8 @@ from backend.storage.data_manager import DataManager
 
 def test_remocao_expirados():
     # Executa o script de remoção
-    script_path = os.path.join(os.path.dirname(__file__), '../scripts/data/remove_expired_editais.py')
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+    script_path = os.path.join(PROJECT_ROOT, 'backend/scripts/data/remove_expired_editais.py')
     spec = importlib.util.spec_from_file_location('remove_expired_editais', script_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
