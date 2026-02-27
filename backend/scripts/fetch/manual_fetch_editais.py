@@ -40,16 +40,13 @@ from backend.storage.data_manager import DataManager
 
 def generate_edital_id(edital):
     """
-    Gera um identificador único para o edital, preferencialmente usando numeroControlePNCP ou ID_C_PNCP.
+    Gera um identificador único para o edital, usando apenas numeroControlePNCP ou ID_C_PNCP.
     """
     if edital.get("numeroControlePNCP"):
         return edital["numeroControlePNCP"]
     if edital.get("ID_C_PNCP"):
         return edital["ID_C_PNCP"]
-    cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao", "")
-    ano = edital.get("anoCompra") or edital.get("ano", "")
-    numero = edital.get("numeroCompra") or edital.get("numero", "")
-    return f"{str(cnpj)}_{str(ano)}_{str(numero)}"
+    return None
 
 
 def padroniza_edital(edital):
@@ -73,21 +70,21 @@ def padroniza_edital(edital):
 
 def padroniza_item(item):
     """
-    Padroniza os campos de identificação do item e adiciona o campo _edital_id.
+    Padroniza os campos de identificação do item e adiciona o campo _edital_id usando apenas IDs oficiais.
     """
     edital_id = (
         item.get("edital_numeroControlePNCP")
         or item.get("edital_ID_C_PNCP")
-        or f"{item.get('edital_cnpj', '')}_{item.get('edital_ano', '')}_{item.get('edital_numero', '')}"
     )
     item["_edital_id"] = edital_id
     if item.get("edital_numeroControlePNCP"):
         item["edital_numeroControlePNCP"] = item["edital_numeroControlePNCP"]
     if item.get("edital_ID_C_PNCP"):
         item["edital_ID_C_PNCP"] = item["edital_ID_C_PNCP"]
-    item["edital_cnpj"] = str(item.get("edital_cnpj", ""))
-    item["edital_ano"] = str(item.get("edital_ano", ""))
-    item["edital_numero"] = str(item.get("edital_numero", ""))
+    # Remove campos de chave composta se não forem mais usados
+    item.pop("edital_cnpj", None)
+    item.pop("edital_ano", None)
+    item.pop("edital_numero", None)
     return item
 
 def main(days=15, fetch_items=True):
@@ -145,16 +142,14 @@ def main(days=15, fetch_items=True):
             try:
                 # 6. Busca itens apenas para novos editais
                 all_itens = data_manager.load_itens()
-                itens_existentes = {(i.get("_edital_id"), i.get("itemSequencial")): i for i in all_itens}
+                itens_existentes = {(i.get("_edital_id"), i.get("itemSequencial")): i for i in all_itens if i.get("_edital_id")}
                 novos_itens = []
                 for edital in novos_editais:
-                    cnpj = edital["cnpj"]
-                    ano = edital["ano"]
-                    numero = edital["numero"]
                     numeroControlePNCP = edital.get("numeroControlePNCP")
                     id_c_pncp = edital.get("ID_C_PNCP")
+                    # Busca itens apenas por identificadores oficiais
                     itens = editais_service.fetch_itens_for_edital(
-                        cnpj, ano, numero, numeroControlePNCP=numeroControlePNCP, id_c_pncp=id_c_pncp
+                        None, None, None, numeroControlePNCP=numeroControlePNCP, id_c_pncp=id_c_pncp
                     )
                     itens_padronizados = [padroniza_item(i.copy()) for i in itens]
                     for item in itens_padronizados:

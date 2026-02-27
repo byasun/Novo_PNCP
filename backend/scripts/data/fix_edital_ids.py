@@ -20,16 +20,13 @@ from backend.storage.data_manager import DataManager
 
 def generate_edital_id(edital):
     """
-    Gera um identificador único para o edital, preferencialmente usando numeroControlePNCP ou ID_C_PNCP.
+    Gera um identificador único para o edital, usando apenas numeroControlePNCP ou ID_C_PNCP.
     """
     if edital.get("numeroControlePNCP"):
         return edital["numeroControlePNCP"]
     if edital.get("ID_C_PNCP"):
         return edital["ID_C_PNCP"]
-    cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao") or edital.get("cnpj")
-    ano = edital.get("anoCompra") or edital.get("ano")
-    numero = edital.get("numeroCompra") or edital.get("numero")
-    return f"{str(cnpj)}_{str(ano)}_{str(numero)}"
+    return None
 
 
 def padroniza_edital_id(edital):

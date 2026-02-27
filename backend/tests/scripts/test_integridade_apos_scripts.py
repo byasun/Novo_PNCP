@@ -5,12 +5,12 @@ from backend.storage.data_manager import DataManager
 
 def test_integridade_apos_scripts():
     # Executa scripts de fix e geração
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
     scripts = [
-        '../scripts/data/fix_edital_ids.py',
-        '../scripts/data/generate_edital_unique_ids_absolute.py'
+        os.path.join(PROJECT_ROOT, 'backend/scripts/data/fix_edital_ids.py'),
+        os.path.join(PROJECT_ROOT, 'backend/scripts/data/generate_edital_unique_ids_absolute.py')
     ]
-    for script in scripts:
-        script_path = os.path.join(os.path.dirname(__file__), script)
+    for script_path in scripts:
         spec = importlib.util.spec_from_file_location('script', script_path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

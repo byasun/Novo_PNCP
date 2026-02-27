@@ -16,6 +16,13 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class EditaisService:
+    def _generate_edital_key(self, edital):
+        """
+        Retorna uma tupla (numeroControlePNCP, ID_C_PNCP) para identificação única e robusta.
+        """
+        numero = str(edital["numeroControlePNCP"]) if edital.get("numeroControlePNCP") else None
+        uuid = str(edital["ID_C_PNCP"]) if edital.get("ID_C_PNCP") else None
+        return (numero, uuid)
     """
     Serviço para gerenciamento de editais do PNCP.
     Realiza busca, sincronização, checkpoint e persistência local dos editais.
@@ -50,14 +57,18 @@ class EditaisService:
             on_checkpoint=save_editais_checkpoint
         )
         logger.info(f"Fetched {len(editais)} editais from API")
-        
+
         # Aplica filtro de data de publicação se solicitado
         if filter_by_publication_date:
             logger.info(f"Applying publication date filter (last {days_publication} days)...")
-            editais = self._filter_editais_by_publication_date(editais, days=days_publication)
-            logger.info(f"After publication date filter: {len(editais)} editais remaining")
-        
-        return editais
+            editais_filtrados = self._filter_editais_by_publication_date(editais, days=days_publication)
+            logger.info(f"After publication date filter: {len(editais_filtrados)} editais remaining")
+            # Salva apenas os editais filtrados
+            self.save_editais(editais_filtrados)
+            return editais_filtrados
+        else:
+            self.save_editais(editais)
+            return editais
     
     def fetch_itens_for_edital(self, cnpj, ano, numero):
         # Busca itens de um edital específico
@@ -205,7 +216,7 @@ class EditaisService:
             skip_existing: Se True, pula editais que já têm itens salvos.
                           Se None, usa valor de ITEMS_SKIP_EXISTING do .env (padrão: True)
         """
-        from backend.config import ITEMS_FETCH_THREADS, ITEMS_FETCH_DELAY_PER_THREAD, ITEMS_FETCH_CHECKPOINT, ITEMS_SKIP_EXISTING
+        from backend.config import ITEMS_FETCH_THREADS, ITEMS_FETCH_DELAY_PER_THREAD, ITEMS_FETCH_CHECKPOINT, ITEMS_SKIP_EXISTING, is_cancelled
         
         # Usa configuração do .env se não especificado
         if skip_existing is None:
@@ -215,26 +226,32 @@ class EditaisService:
             logger.info("No editais provided for item fetching")
             return []
 
+        # Garante que todos os editais tenham ID_C_PNCP
+        import uuid
+        for edital in editais:
+            if not edital.get("ID_C_PNCP"):
+                edital["ID_C_PNCP"] = str(uuid.uuid4())
+        
+        # Verifica cancelamento antes de iniciar
+        if is_cancelled():
+            logger.warning("Operação de busca de itens cancelada antes de iniciar.")
+            return []
+
         # Carrega itens existentes para evitar duplicidades
         existing_itens = self.data_manager.load_itens()
         existing_keys = set()
-        existing_edital_keys = set()  # Chaves de editais que já têm itens
+        existing_edital_keys = set()  # IDs oficiais de editais que já têm itens
 
         for item in existing_itens:
-            # Cria chave única para deduplicação de itens
-            key = (
-                item.get('edital_numeroControlePNCP')
-                or item.get('edital_ID_C_PNCP')
-                or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
-            )
-            existing_keys.add(key)
-            # Cria chave do edital para verificar quais já foram processados
-            edital_key = (
-                item.get('edital_numeroControlePNCP')
-                or item.get('edital_ID_C_PNCP')
-                or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}"
-            )
-            existing_edital_keys.add(edital_key)
+            # Cria chave única para deduplicação de itens (considera ambos IDs)
+            numero = item.get('edital_numeroControlePNCP')
+            uuid = item.get('edital_ID_C_PNCP')
+            if numero:
+                existing_keys.add(numero)
+                existing_edital_keys.add(numero)
+            if uuid:
+                existing_keys.add(uuid)
+                existing_edital_keys.add(uuid)
         
         logger.info(f"Loaded {len(existing_itens)} existing items from storage")
         logger.info(f"Found {len(existing_edital_keys)} editais with items already saved")
@@ -246,12 +263,8 @@ class EditaisService:
             for edital in editais:
                 numero_controle = edital.get("numeroControlePNCP")
                 id_c_pncp = edital.get("ID_C_PNCP")
-                cnpj = (edital.get("orgaoEntidade", {}) or {}).get("cnpj") or edital.get("cnpjOrgao")
-                ano = edital.get("anoCompra") or edital.get("ano")
-                numero = edital.get("numeroCompra") or edital.get("numero")
-                edital_key = numero_controle or id_c_pncp or f"{cnpj}_{ano}_{numero}"
-
-                if edital_key in existing_edital_keys:
+                edital_key = numero_controle or id_c_pncp
+                if edital_key and edital_key in existing_edital_keys:
                     skipped_count += 1
                 else:
                     editais_to_process.append(edital)
@@ -276,27 +289,32 @@ class EditaisService:
             # Submit all tasks
             futures = {}
             for idx, edital in enumerate(editais, start=1):
+                if is_cancelled():
+                    logger.warning("Cancelamento solicitado. Parando submissão de novas tarefas.")
+                    break
                 future = executor.submit(self._fetch_items_for_single_edital, idx, len(editais), edital, ITEMS_FETCH_DELAY_PER_THREAD)
                 futures[future] = idx
             
             # Collect results as they complete and save incrementally
             for future in as_completed(futures):
+                if is_cancelled():
+                    logger.warning("Cancelamento solicitado. Parando processamento de resultados.")
+                    break
                 try:
                     itens = future.result()
-                    
-                    # Remove duplicados (itens já conhecidos)
+                    # Remove duplicados (itens já conhecidos) usando apenas IDs oficiais
                     for item in itens:
-                        key = (
-                            item.get('edital_numeroControlePNCP')
-                            or item.get('edital_ID_C_PNCP')
-                            or f"{item.get('edital_cnpj')}_{item.get('edital_ano')}_{item.get('edital_numero')}_{item.get('numeroItem')}"
-                        )
-                        if key not in existing_keys:
+                        numero = item.get('edital_numeroControlePNCP')
+                        uuid = item.get('edital_ID_C_PNCP')
+                        added = False
+                        if numero and numero not in existing_keys:
                             all_itens.append(item)
-                            existing_keys.add(key)
-                    
+                            existing_keys.add(numero)
+                            added = True
+                        if uuid and uuid not in existing_keys and not added:
+                            all_itens.append(item)
+                            existing_keys.add(uuid)
                     processed_count += 1
-                    
                     # Salva checkpoint a cada N editais
                     if processed_count % ITEMS_FETCH_CHECKPOINT == 0:
                         logger.info(f"Checkpoint: {processed_count}/{len(editais)} editais processed, {len(all_itens)} total items, saving...")
@@ -305,7 +323,6 @@ class EditaisService:
                             logger.info(f"Checkpoint saved successfully")
                         except Exception:
                             logger.exception("Failed to save checkpoint")
-                            
                 except Exception as e:
                     idx = futures[future]
                     logger.error(f"Error in parallel fetch for edital {idx}: {e}")
@@ -346,10 +363,14 @@ class EditaisService:
         return all_itens
     
     def _fetch_items_for_single_edital(self, idx, total, edital, delay_per_request):
+        from backend.config import is_cancelled
         """
         Busca itens de um edital específico (executa em thread).
         """
         try:
+            if is_cancelled():
+                logger.info(f"Thread de edital {idx}/{total} cancelada antes de iniciar.")
+                return []
             cnpj = (edital.get("orgaoEntidade", {}) or {}).get("cnpj") or edital.get("cnpjOrgao")
             ano = edital.get("anoCompra") or edital.get("ano")
             numero = edital.get("numeroCompra") or edital.get("numero")
@@ -357,19 +378,27 @@ class EditaisService:
             if not cnpj or not ano or not numero:
                 logger.debug(f"Skipping edital {idx}/{total} with missing identifiers: cnpj={cnpj}, ano={ano}, numero={numero}")
                 return []
+            if is_cancelled():
+                logger.info(f"Thread de edital {idx}/{total} cancelada após checagem de identificadores.")
+                return []
 
             mes = self._extract_month_from_edital(edital)
             itens = []
             
             if not mes:
                 logger.debug(f"Could not determine month for edital {idx}/{total}: {cnpj}/{ano}/{numero}")
+                if is_cancelled():
+                    logger.info(f"Thread de edital {idx}/{total} cancelada antes de buscar itens.")
+                    return []
                 itens = self.client.get_itens_edital(cnpj, ano, numero)
                 itens = itens or []
             else:
                 # Primeiro, checa quantidade para evitar chamadas desnecessárias
                 item_count = self.client.get_itens_edital_count(cnpj, ano, mes)
                 time.sleep(delay_per_request)
-                
+                if is_cancelled():
+                    logger.info(f"Thread de edital {idx}/{total} cancelada após checar quantidade.")
+                    return []
                 if item_count == 0:
                     logger.debug(f"No items for edital {idx}/{total}: {cnpj}/{ano}/{mes} (count=0)")
                     itens = []
@@ -378,33 +407,28 @@ class EditaisService:
                     # Use paginated items endpoint
                     page = 1
                     while True:
+                        if is_cancelled():
+                            logger.info(f"Thread de edital {idx}/{total} cancelada durante paginação.")
+                            break
                         page_items = self.client.get_itens_edital_paginated(cnpj, ano, mes, page=page)
                         time.sleep(delay_per_request)
-                        
                         if not page_items:
                             break
                         itens.extend(page_items)
                         logger.debug(f"  Edital {idx}/{total}: Page {page}: {len(page_items)} items, total: {len(itens)}")
                         page += 1
 
-            # Anota itens com chaves do edital (padroniza como string)
+            # Vincula todos os itens ao edital, preenchendo sempre os campos oficiais
             itens_ajustados = []
+            id_c_pncp = edital.get("ID_C_PNCP")
+            numero_controle = edital.get("numeroControlePNCP")
             for item in itens:
-                item["edital_cnpj"] = str(cnpj) if cnpj is not None else ""
-                item["edital_ano"] = str(ano) if ano is not None else ""
-                item["edital_numero"] = str(numero) if numero is not None else ""
-                # Adiciona identificadores únicos se disponíveis
-                if edital.get("numeroControlePNCP"):
-                    item["edital_numeroControlePNCP"] = edital.get("numeroControlePNCP")
-                if edital.get("ID_C_PNCP"):
-                    item["edital_ID_C_PNCP"] = edital.get("ID_C_PNCP")
-                # Garante que edital_ID_C_PNCP seja o primeiro campo se existir
-                if "edital_ID_C_PNCP" in item:
-                    novo_item = {"edital_ID_C_PNCP": item["edital_ID_C_PNCP"]}
-                    novo_item.update({k: v for k, v in item.items() if k != "edital_ID_C_PNCP"})
-                    itens_ajustados.append(novo_item)
-                else:
-                    itens_ajustados.append(item)
+                item["edital_ID_C_PNCP"] = id_c_pncp
+                item["edital_numeroControlePNCP"] = numero_controle
+                # Garante que edital_ID_C_PNCP seja o primeiro campo
+                novo_item = {"edital_ID_C_PNCP": id_c_pncp, "edital_numeroControlePNCP": numero_controle}
+                novo_item.update({k: v for k, v in item.items() if k not in ["edital_ID_C_PNCP", "edital_numeroControlePNCP"]})
+                itens_ajustados.append(novo_item)
             if itens_ajustados:
                 logger.info(f"Completed edital {idx}/{total}: fetched {len(itens_ajustados)} itens")
             return itens_ajustados
@@ -418,37 +442,25 @@ class EditaisService:
         return self.data_manager.load_editais()
     
     def get_edital_by_key(self, edital_key):
-        # Busca edital por identificador único (numeroControlePNCP, ID_C_PNCP ou chave composta)
+        # Busca edital por identificador único (numeroControlePNCP ou ID_C_PNCP)
         editais = self.data_manager.load_editais()
         for edital in editais:
             key = (
                 edital.get("numeroControlePNCP")
                 or edital.get("ID_C_PNCP")
-                or self._generate_edital_key(edital)
             )
             if key == edital_key:
                 return edital
         return None
     
-    def get_itens_by_edital(self, cnpj=None, ano=None, numero=None, numeroControlePNCP=None, id_c_pncp=None):
-        # Busca itens por qualquer identificador único ou chave composta (compatibilidade)
+    def get_itens_by_edital(self, numeroControlePNCP=None, id_c_pncp=None):
+        # Busca itens apenas por identificador único
         all_itens = self.data_manager.load_itens()
         if numeroControlePNCP:
             return [item for item in all_itens if str(item.get("edital_numeroControlePNCP", "")) == str(numeroControlePNCP)]
         if id_c_pncp:
             return [item for item in all_itens if str(item.get("edital_ID_C_PNCP", "")) == str(id_c_pncp)]
-        # Fallback para chave composta
-        cnpj = str(cnpj) if cnpj is not None else ""
-        ano = str(ano) if ano is not None else ""
-        numero = str(numero) if numero is not None else ""
-        return [
-            item for item in all_itens
-            if (
-                str(item.get("edital_cnpj", "")) == cnpj and
-                str(item.get("edital_ano", "")) == ano and
-                str(item.get("edital_numero", "")) == numero
-            )
-        ]
+        return []
 
     def get_itens_by_edital_id(self, id_c_pncp):
         # Novo método: filtra itens por edital_ID_C_PNCP
@@ -457,17 +469,6 @@ class EditaisService:
             item for item in all_itens
             if str(item.get("edital_ID_C_PNCP", "")) == str(id_c_pncp)
         ]
-    
-    def _generate_edital_key(self, edital):
-        # Gera chave única para lookup (preferencialmente identificadores únicos)
-        if edital.get("numeroControlePNCP"):
-            return edital.get("numeroControlePNCP")
-        if edital.get("ID_C_PNCP"):
-            return edital.get("ID_C_PNCP")
-        cnpj = edital.get("orgaoEntidade", {}).get("cnpj", "") or edital.get("cnpjOrgao", "")
-        ano = edital.get("anoCompra", "")
-        numero = edital.get("numeroCompra", "")
-        return f"{cnpj}_{ano}_{numero}"
     
     def save_editais(self, editais):
         # Garante que ID_C_PNCP seja o primeiro campo de cada edital
@@ -510,15 +511,21 @@ class EditaisService:
         logger.info("No local editais found. Performing full fetch...")
         editais = self.fetch_all_editais(data_inicial, data_final, codigo_modalidade)
         if editais:
+            # Gera UUID para cada edital se não existir e salva
+            import uuid
+            for edital in editais:
+                if not edital.get("ID_C_PNCP"):
+                    edital["ID_C_PNCP"] = str(uuid.uuid4())
             self.save_editais(editais)
-            logger.info(f"Successfully saved {len(editais)} editais")
+            logger.info(f"Successfully saved {len(editais)} editais (UUIDs garantidos)")
             try:
                 self.fetch_itens_for_all_editais(editais)
             except Exception:
                 logger.exception("Error while fetching itens for editais")
         else:
             logger.warning("No editais were fetched from API")
-        return editais
+        # Garante retorno da lista completa salva
+        return self.data_manager.load_editais()
 
     def sync_editais(self, data_inicial=None, data_final=None, codigo_modalidade=6, filter_by_publication_date=False, days_publication=15):
         """
@@ -580,9 +587,14 @@ class EditaisService:
                 except Exception:
                     return None
 
+        import uuid
         for remote in remote_editais:
             key = self._generate_edital_key(remote)
             remote_ts = to_ts(remote.get("dataPublicacaoPncp") or remote.get("dataAtualizacao") or remote.get("dataPublicacao") or remote.get("dataInclusao"))
+
+            # Garante UUID para cada edital
+            if not remote.get("ID_C_PNCP"):
+                remote["ID_C_PNCP"] = str(uuid.uuid4())
 
             if key in local_map:
                 idx, local = local_map[key]
@@ -590,6 +602,9 @@ class EditaisService:
                 # If remote has newer timestamp, replace local
                 if remote_ts and (not local_ts or remote_ts > local_ts):
                     logger.info(f"Updating local edital {key}: remote is newer ({remote_ts} > {local_ts})")
+                    # Garante UUID para edital atualizado
+                    if not remote.get("ID_C_PNCP"):
+                        remote["ID_C_PNCP"] = str(uuid.uuid4())
                     local_editais[idx] = remote
                     updated += 1
                 else:
@@ -598,6 +613,8 @@ class EditaisService:
             else:
                 # Novo edital: adicionar e coletar itens
                 logger.info(f"Adding new edital {key}")
+                if not remote.get("ID_C_PNCP"):
+                    remote["ID_C_PNCP"] = str(uuid.uuid4())
                 local_editais.append(remote)
                 new_editais.append(remote)
                 added += 1

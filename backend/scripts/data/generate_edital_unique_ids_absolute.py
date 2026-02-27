@@ -21,16 +21,13 @@ from backend.storage.data_manager import DataManager
 
 def generate_edital_key(edital):
     """
-    Gera uma chave única baseada em numeroControlePNCP, ID_C_PNCP ou (CNPJ, ano, numero).
+    Gera uma chave única baseada apenas em numeroControlePNCP ou ID_C_PNCP.
     """
     if edital.get("numeroControlePNCP"):
         return edital["numeroControlePNCP"]
     if edital.get("ID_C_PNCP"):
         return edital["ID_C_PNCP"]
-    cnpj = edital.get("orgaoEntidade", {}).get("cnpj") or edital.get("cnpjOrgao") or edital.get("cnpj")
-    ano = edital.get("anoCompra") or edital.get("ano")
-    numero = edital.get("numeroCompra") or edital.get("numero")
-    return f"{str(cnpj)}_{str(ano)}_{str(numero)}"
+    return None
 
 
 def main():

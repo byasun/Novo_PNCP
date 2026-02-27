@@ -8,29 +8,9 @@ verificando geração de chaves, fallback de campos e extração de mês.
 from backend.services.editais_service import EditaisService
 
 
-def test_generate_edital_key_prefers_orgao_cnpj():
-    # Deve preferir cnpj do órgão quando disponível
-    service = EditaisService()
-    edital = {
-        "orgaoEntidade": {"cnpj": "123"},
-        "cnpjOrgao": "999",
-        "anoCompra": 2026,
-        "numeroCompra": 10,
-    }
-    key = service._generate_edital_key(edital)
-    assert key == "123_2026_10"
-
-
-def test_generate_edital_key_fallbacks():
-    # Deve usar cnpjOrgao quando orgaoEntidade não existir
-    service = EditaisService()
-    edital = {
-        "cnpjOrgao": "555",
-        "anoCompra": 2025,
-        "numeroCompra": 7,
-    }
-    key = service._generate_edital_key(edital)
-    assert key == "555_2025_7"
+"""
+Testes removidos: geração e fallback de chave composta não são mais suportados. Apenas IDs oficiais são aceitos.
+"""
 
 
 def test_extract_month_from_edital():
