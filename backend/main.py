@@ -13,12 +13,9 @@ import sys
 import uuid
 
 # Ajusta sys.path para garantir importação do pacote backend ao rodar diretamente
-import sys
-import os
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
-
 
 # Importa configurações antes de configurar o logger
 from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR
@@ -47,17 +44,9 @@ def _shutdown_handler(signum, frame):
 def _invalidate_all_sessions():
     """Função para invalidar todas as sessões (executada ao sair)."""
     logger.info("Invalidando todas as sessões (logout global).")
-    # Aqui você pode adicionar lógica extra se necessário
-
-# Permite executar como script dentro de backend/ (python main.py)
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
-
 
 # Garante a pasta de logs
-if not os.path.exists(LOGS_DIR):
-    os.makedirs(LOGS_DIR)
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 def main():
     """

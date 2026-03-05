@@ -6,57 +6,18 @@ incluindo endpoints de API, autenticação Clerk, integração com o frontend Re
 e gerenciamento de sessões de usuário.
 """
 
-from flask import Flask, jsonify, send_file, request, send_from_directory
-from flask_cors import CORS
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-import backend.storage.auth_db as auth_db
-
-# ...existing code...
-
-# (A definição da rota /api/itens/<id_c_pncp> deve ser movida para depois da criação do objeto app)
-from backend.web.clerk_auth import clerk_login_required
-"""
-Aplicação web Flask (API + SPA React).
-
-Este módulo implementa a aplicação web principal do sistema PNCP,
-incluindo endpoints de API, autenticação Clerk, integração com o frontend React
-e gerenciamento de sessões de usuário.
-"""
-
-from flask import Flask, jsonify, send_file, request, send_from_directory
-from flask_cors import CORS
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-import backend.storage.auth_db as auth_db
-
-# Inicialização do Flask app
-app = Flask(__name__)
-CORS(app)
-login_manager = LoginManager(app)
-
-# Clerk JWT auth
-# Endpoint para registrar usuário Clerk autenticado
-
-@app.route("/api/register-clerk-user", methods=["POST"])
-@clerk_login_required
-def register_clerk_user():
-    user = getattr(request, "clerk_user", {})
-    clerk_id = user.get("sub")
-    email = user.get("email")
-    name = user.get("name") or user.get("given_name")
-    # Cria usuário no banco de dados
-    if not clerk_id or not email:
-        return {"error": "Dados insuficientes do Clerk"}, 400
-    # Verifica se já existe
-    if auth_db.user_exists(clerk_id):
-        return {"message": "Usuário já registrado", "clerk_id": clerk_id}, 200
-    auth_db.create_user(clerk_id, email, name)
-    return {"message": "Usuário registrado com sucesso", "clerk_id": clerk_id}, 201
-from backend.web.clerk_auth import clerk_login_required
-from flask_wtf.csrf import CSRFProtect
 import os
+import re
 import logging
 from datetime import datetime, timedelta
-import re
+
+from flask import Flask, jsonify, send_file, request, send_from_directory
+from flask_cors import CORS
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_wtf.csrf import CSRFProtect
+
+import backend.storage.auth_db as auth_db
+from backend.web.clerk_auth import clerk_login_required
 from backend.services.editais_service import EditaisService
 from backend.storage.data_manager import DataManager
 from backend.storage.auth_db import (
@@ -81,6 +42,10 @@ from backend.export.exporter import Exporter
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Inicialização do Flask app
+# ---------------------------------------------------------------------------
+
 WEB_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(WEB_DIR, "..", ".."))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
@@ -88,27 +53,6 @@ REACT_DIST_DIR = os.path.join(FRONTEND_DIR, "react", "dist")
 
 app = Flask(__name__, static_folder=REACT_DIST_DIR)
 
-# Endpoint para status autenticado via Clerk (deve vir após definição do app)
-@app.route("/api/clerk-status")
-@clerk_login_required
-def api_clerk_status():
-    user = getattr(request, "clerk_user", {})
-    return jsonify({
-        "status": "authenticated",
-        "clerk_id": user.get("sub"),
-        "email": user.get("email"),
-        "name": user.get("name"),
-        "username": user.get("username"),
-        "user": user
-    })
-
-# Endpoint Clerk protegido (deve vir após definição de app)
-@app.route("/api/secure-clerk")
-@clerk_login_required
-def api_secure_clerk():
-    # Exemplo de endpoint protegido por Clerk JWT
-    user = getattr(request, "clerk_user", {})
-    return jsonify({"message": "Acesso autorizado via Clerk!", "user": user})
 # CORS para frontend separado (React)
 allowed_origins_env = os.getenv("PNCP_FRONTEND_ORIGINS", "")
 allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
@@ -123,6 +67,7 @@ CORS(
     },
     supports_credentials=True,
 )
+
 # Permite URLs com e sem "/" no final
 app.url_map.strict_slashes = False
 app.config["SECRET_KEY"] = SECRET_KEY
@@ -207,6 +152,52 @@ def add_header(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+# ---------------------------------------------------------------------------
+# Rotas Clerk (autenticação JWT)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/register-clerk-user", methods=["POST"])
+@clerk_login_required
+def register_clerk_user():
+    """Registra usuário Clerk autenticado no banco local."""
+    user = getattr(request, "clerk_user", {})
+    clerk_id = user.get("sub")
+    email = user.get("email")
+    name = user.get("name") or user.get("given_name")
+    if not clerk_id or not email:
+        return {"error": "Dados insuficientes do Clerk"}, 400
+    if auth_db.user_exists(clerk_id):
+        return {"message": "Usuário já registrado", "clerk_id": clerk_id}, 200
+    auth_db.create_user(clerk_id, email, name)
+    return {"message": "Usuário registrado com sucesso", "clerk_id": clerk_id}, 201
+
+
+@app.route("/api/clerk-status")
+@clerk_login_required
+def api_clerk_status():
+    """Status do usuário Clerk autenticado."""
+    user = getattr(request, "clerk_user", {})
+    return jsonify({
+        "status": "authenticated",
+        "clerk_id": user.get("sub"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "username": user.get("username"),
+        "user": user
+    })
+
+
+@app.route("/api/secure-clerk")
+@clerk_login_required
+def api_secure_clerk():
+    """Endpoint de exemplo protegido por Clerk JWT."""
+    user = getattr(request, "clerk_user", {})
+    return jsonify({"message": "Acesso autorizado via Clerk!", "user": user})
+
+# ---------------------------------------------------------------------------
+# Rotas de dados (editais, itens, status)
+# ---------------------------------------------------------------------------
 
 @app.route("/")
 def spa():
@@ -419,23 +410,15 @@ def spa_routes(edital_key=None):
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
-    full_path = os.path.join(REACT_DIST_DIR, "assets", filename)
-    print("Servindo arquivo estático:", full_path)
     return send_from_directory(os.path.join(REACT_DIST_DIR, "assets"), filename)
 
+
+@app.route("/<path:path>")
 def serve_spa_fallback(path):
+    """Serve index.html para qualquer rota não-API (SPA fallback)."""
     full_path = os.path.join(REACT_DIST_DIR, path)
     if os.path.exists(full_path) and os.path.isfile(full_path):
         return send_from_directory(REACT_DIST_DIR, path)
-    return _serve_spa()
-@app.route("/<path:path>")
-def serve_spa_fallback(path):
-    # Serve index.html para qualquer rota não-API
-    if path.startswith("api/") or path.startswith("assets/"):
-        full_path = os.path.join(REACT_DIST_DIR, path)
-        if os.path.exists(full_path) and os.path.isfile(full_path):
-            return send_from_directory(REACT_DIST_DIR, path)
-        return _serve_spa()
     return _serve_spa()
 
 if __name__ == "__main__":
