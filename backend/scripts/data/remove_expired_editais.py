@@ -6,6 +6,7 @@ Também realiza backup dos arquivos antes de sobrescrever.
 """
 import os
 import json
+import shutil
 import sys
 from datetime import datetime
 
@@ -41,12 +42,14 @@ def save_json(path, data):
 def backup_file(path, backup_dir):
     """
     Realiza backup do arquivo em um diretório específico, adicionando sufixo com data/hora.
+    Usa shutil.copy2 ao invés de os.rename para evitar PermissionError no Windows
+    quando o arquivo está em uso por outro processo (ex: OneDrive sync).
     """
     if os.path.exists(path):
         os.makedirs(backup_dir, exist_ok=True)
         base = os.path.basename(path)
         backup_path = os.path.join(backup_dir, f"{base}{BACKUP_SUFFIX}")
-        os.rename(path, backup_path)
+        shutil.copy2(path, backup_path)
 
 def main():
     """
