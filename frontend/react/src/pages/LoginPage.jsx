@@ -1,3 +1,7 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { SignIn, useAuth } from '@clerk/clerk-react';
+import { useClerkApi } from '../hooks/useClerkApi';
 
 // Página de login do sistema.
 // Exibe o componente de autenticação Clerk e, ao autenticar, registra o usuário e redireciona para editais.

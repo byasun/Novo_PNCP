@@ -245,6 +245,15 @@ def api_edital_itens(edital_key):
     itens = editais_service.get_itens_by_edital_id(id_c_pncp)
     return jsonify({"total": len(itens), "data": itens})
 
+
+@app.route("/api/itens/<path:id_c_pncp>")
+@clerk_login_required
+def api_itens_by_id_c_pncp(id_c_pncp):
+    # Busca itens diretamente por ID_C_PNCP
+    itens = editais_service.get_itens_by_edital_id(id_c_pncp)
+    return jsonify({"total": len(itens), "data": itens})
+
+
 @app.route("/api/editais/count")
 @clerk_login_required
 def api_editais_count():
@@ -299,23 +308,23 @@ def trigger_update():
     return jsonify({"status": "error", "message": "Scheduler not available"}), 500
 
 @app.route("/download/<filename>")
-@login_required
+@clerk_login_required
 def download_file(filename):
-    # Download de arquivos CSV/XLSX exportados
+    # Download de arquivos CSV/XLSX exportados (gerados no startup/background)
     allowed_files = ["editais.csv", "editais.xlsx"]
     if filename not in allowed_files:
         return jsonify({"error": "File not found"}), 404
-    # Build absolute path to data directory
     file_path = os.path.join(DATA_DIR, filename)
-    try:
-        # Sempre exporta/atualiza os arquivos antes de servir
-        editais = data_manager.load_editais()
-        exporter.export_editais(editais)
-    except Exception as e:
-        logger.error(f"Error generating export file {filename}: {e}")
-        return jsonify({"error": "File not available yet"}), 404
     if not os.path.exists(file_path):
-        return jsonify({"error": "File not available yet"}), 404
+        # Se o arquivo ainda não existe, tenta gerar sob demanda
+        try:
+            editais = data_manager.load_editais()
+            exporter.export_editais(editais)
+        except Exception as e:
+            logger.error(f"Error generating export file {filename}: {e}")
+            return jsonify({"error": "File not available yet. Export is still running, try again in a few seconds."}), 503
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not available yet. Export is still running, try again in a few seconds."}), 503
     return send_file(file_path, as_attachment=True)
 
 
@@ -345,10 +354,13 @@ def login():
 
 
 @app.route("/logout", methods=["POST", "GET"])
-@login_required
 @csrf.exempt
 def logout():
-    logout_user()
+    # Suporta logout tanto de sessão Flask-Login quanto de Clerk
+    try:
+        logout_user()
+    except Exception:
+        pass
     return jsonify({"status": "success", "message": "Logged out"})
 
 

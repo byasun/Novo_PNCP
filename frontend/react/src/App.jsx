@@ -19,7 +19,7 @@ const formatDateBR = (dateString) => {
 }
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { useAuth as useClerkAuth } from '@clerk/react-router';
+import { useAuth as useClerkAuth, useClerk } from '@clerk/react-router';
 import {
   Routes,
   Route,
@@ -119,6 +119,7 @@ const AuthProvider = ({ children }) => {
   const [message, setMessage] = useState('');
   const [clerkToken, setClerkToken] = useState(null);
   const { getToken, isSignedIn } = useClerkAuth();
+  const { signOut } = useClerk();
 
   // Atualiza status de autenticação do usuário consultando a API
   const refreshStatus = useCallback(async () => {
@@ -176,7 +177,12 @@ const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await fetchJson('/logout', { method: 'POST' });
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Erro ao fazer logout no Clerk:', err);
+    }
+    setClerkToken(null);
     setAuthStatus('unauthenticated');
     setStatusInfo(null);
   };
@@ -228,7 +234,6 @@ const Layout = ({ children, onLogout }) => {
     <div className="app">
       <Header>
         <div>
-          <p className="app__eyebrow">PNCP</p>
           <h1>Portal de Editais</h1>
         </div>
         {authStatus === 'authenticated' && (
