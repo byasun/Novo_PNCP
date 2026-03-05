@@ -1,14 +1,15 @@
 # Frontend PNCP
 
-SPA desenvolvida em React (Vite) para visualização, busca e interação com editais, contratos e itens do PNCP.
+SPA desenvolvida em React (Vite) para visualização, busca e interação com editais, contratos e itens do Portal Nacional de Contratações Públicas (PNCP).
 
 ## Principais Funcionalidades
 - Interface moderna e responsiva
-- Busca e filtros de editais
-- Visualização detalhada de editais e itens
-- Download de arquivos exportados (CSV/XLSX)
-- Autenticação e proteção de rotas via Clerk (JWT)
-- Criação de usuário e login integrados ao backend
+- Busca e filtros de editais com contagem de resultados
+- Visualização detalhada de editais e itens vinculados
+- Download autenticado de arquivos exportados (CSV/XLSX) via fetch + blob
+- Autenticação e proteção de rotas via Clerk (JWT SSO)
+- Registro automático de usuário Clerk no backend no primeiro login
+- Logout integrado com Clerk (`signOut()`) — sessão encerrada no navegador e no Clerk
 - Navegação protegida: apenas usuários autenticados acessam dados
 
 ## Instalação e Execução
@@ -34,67 +35,99 @@ Acesse em: http://localhost:5173
 ```
 frontend/
 └── react/
-        ├── public/         # Arquivos públicos (favicon, etc)
-        ├── src/
-        │   ├── assets/     # Imagens e recursos estáticos
-        │   ├── components/ # Componentes reutilizáveis (Header, Navbar, Table, Card, Footer, RequireClerkAuth, SecureClerkExample, Button)
-        │   ├── hooks/      # Hooks customizados (useClerkApi, useClerkJwt)
-        │   ├── pages/      # Páginas principais (Landing, Login, Editais, EditalDetail, CreateUser, NotFound, SsoCallback)
-        │   ├── App.jsx     # Componente raiz, contexto de autenticação, rotas
-        │   ├── main.jsx    # Ponto de entrada, providers
-        │   └── ...         # Outros arquivos
-        ├── package.json    # Dependências
-        ├── vite.config.js  # Configuração do Vite e proxy
-        └── ...             # Outros arquivos
+    ├── public/             # Arquivos públicos (favicon, etc)
+    ├── src/
+    │   ├── assets/         # Imagens e recursos estáticos
+    │   ├── components/
+    │   │   ├── Header.jsx          # Cabeçalho com navegação
+    │   │   ├── Navbar.jsx          # Barra de navegação
+    │   │   ├── Table.jsx           # Tabela de dados reutilizável
+    │   │   ├── Card.jsx            # Card de informação
+    │   │   ├── Footer.jsx          # Rodapé
+    │   │   ├── Button.jsx          # Botão reutilizável
+    │   │   ├── RequireClerkAuth.jsx# Guard de rota (exige autenticação Clerk)
+    │   │   └── SecureClerkExample.jsx # Exemplo de componente protegido
+    │   ├── hooks/
+    │   │   ├── useClerkApi.js      # Fetch autenticado com JWT Clerk
+    │   │   └── useClerkJwt.js      # Acesso direto ao JWT Clerk
+    │   ├── pages/
+    │   │   ├── LandingPage.jsx     # Página inicial (boas-vindas)
+    │   │   ├── LoginPage.jsx       # Login via Clerk SignIn
+    │   │   ├── CreateUserPage.jsx  # Criação de usuário Clerk
+    │   │   ├── EditaisPage.jsx     # Lista de editais, busca, download CSV/XLSX
+    │   │   ├── EditalDetailPage.jsx# Detalhes do edital e itens vinculados
+    │   │   ├── SsoCallbackPage.jsx # Callback SSO Clerk
+    │   │   ├── SsoCallbackRedirect.jsx # Redirect pós-SSO
+    │   │   └── NotFoundPage.jsx    # Página 404
+    │   ├── App.jsx         # Componente raiz, AuthProvider, rotas, layout
+    │   ├── main.jsx        # Ponto de entrada, ClerkProvider
+    │   └── ...
+    ├── package.json
+    ├── vite.config.js      # Configuração Vite + proxy para API
+    └── .env                # Variáveis de ambiente
 ```
 
 ## Autenticação e Proteção de Rotas
-- Utiliza Clerk para autenticação (SSO, JWT, registro e login)
-- Todas as páginas de dados (editais, detalhes) exigem autenticação
-- Componentes `RequireClerkAuth` e `RequireAuth` garantem proteção de rotas
-- Após login, o usuário é registrado no backend via `/api/register-clerk-user`
-- Logout disponível no menu superior
+- Utiliza **Clerk** para autenticação (SSO, JWT, registro e login)
+- Todas as páginas de dados (editais, detalhes, download) exigem autenticação
+- `RequireClerkAuth` protege rotas que requerem login
+- Após login, o usuário é registrado automaticamente no backend via `/api/register-clerk-user`
+- **Logout**: chama `signOut()` do Clerk via hook `useClerk()`, encerrando a sessão JWT (não depende de sessão Flask)
 
 ## Integração com Backend
-- Todas as requisições protegidas usam JWT do Clerk via hook `useClerkApi`
-- Proxy automático para rotas `/api`, `/login`, `/logout`, `/users`, `/download` durante desenvolvimento (ver `vite.config.js`)
-- Variáveis de ambiente:
-    - `VITE_API_URL`: URL base da API Flask
-    - `VITE_API_PROXY_TARGET`: URL alvo do proxy (ex: http://localhost:5000)
-    - `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_SIGNIN_URL`, `VITE_CLERK_SIGNUP_URL`: dados do Clerk
 
-## Principais Páginas e Fluxos
-- **LandingPage**: Boas-vindas, links para login e cadastro
-- **LoginPage**: Autenticação Clerk, registro automático no backend, redireciona para editais
-- **CreateUserPage**: Criação de usuário Clerk e registro no backend
-- **EditaisPage**: Lista de editais, busca, atualização manual, navegação para detalhes
-- **EditalDetailPage**: Detalhes completos do edital e itens vinculados
-- **SsoCallbackPage/SsoCallbackRedirect**: Fluxo de autenticação SSO
-- **NotFoundPage**: Página 404
+### Requisições autenticadas
+Todas as chamadas a endpoints protegidos utilizam o hook `useClerkApi`, que injeta automaticamente o JWT Clerk no header `Authorization: Bearer <token>`.
 
-## Hooks Customizados
-- `useClerkApi`: Fetch autenticado com JWT Clerk para endpoints protegidos
-- `useClerkJwt`: Acesso direto ao JWT Clerk
+### Download de arquivos (CSV/XLSX)
+- Os botões "Baixar CSV" e "Baixar XLSX" na página de editais usam **fetch autenticado + blob download**
+- O token Clerk é enviado no header da requisição para `/download/editais.csv` e `/download/editais.xlsx`
+- Não usa `<a href>` (que não enviaria o token de autenticação)
 
-## Exemplo de Uso de API Protegida
-```jsx
-import { useClerkApi } from '../hooks/useClerkApi';
-const { fetchWithClerk } = useClerkApi();
-// ...
-const data = await fetchWithClerk('/api/secure-clerk');
-```
+### Proxy de desenvolvimento
+O Vite redireciona automaticamente chamadas de API durante desenvolvimento (ver `vite.config.js`):
+- `/api/*` → backend Flask
+- `/login`, `/logout`, `/users`, `/download` → backend Flask
+- Configurado pela variável `VITE_API_PROXY_TARGET`
 
-## Configuração
-Defina variáveis em `frontend/react/.env`:
-```
+## Variáveis de Ambiente
+Defina em `frontend/react/.env`:
+```env
 VITE_API_URL=http://localhost:5000
 VITE_API_PROXY_TARGET=http://localhost:5000
-VITE_CLERK_PUBLISHABLE_KEY=chave_publica_do_clerk
-VITE_CLERK_SIGNIN_URL=https://clerk.seudominio.com/sign-in
-VITE_CLERK_SIGNUP_URL=https://clerk.seudominio.com/sign-up
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+VITE_CLERK_SIGNIN_URL=/login
+VITE_CLERK_SIGNUP_URL=/create-user
 ```
+
+## Hooks Customizados
+
+### `useClerkApi`
+Fetch autenticado com JWT Clerk para qualquer endpoint protegido.
+```jsx
+import { useClerkApi } from '../hooks/useClerkApi';
+
+const { fetchWithClerk } = useClerkApi();
+const data = await fetchWithClerk('/api/editais');
+```
+
+### `useClerkJwt`
+Acesso direto ao token JWT Clerk (útil para debugging ou chamadas manuais).
+
+## Principais Páginas e Fluxos
+
+| Página | Rota | Descrição |
+|--------|------|-----------|
+| LandingPage | `/` | Boas-vindas, links para login e cadastro |
+| LoginPage | `/login` | Autenticação via Clerk `SignIn`, registro automático no backend |
+| CreateUserPage | `/create-user` | Criação de conta via Clerk |
+| EditaisPage | `/editais` | Lista de editais, busca, download CSV/XLSX |
+| EditalDetailPage | `/edital/:key` | Detalhes completos do edital e itens vinculados |
+| SsoCallbackPage | `/sso-callback` | Callback de autenticação SSO |
+| NotFoundPage | `*` | Página 404 |
 
 ## Observações
 - O frontend depende do backend Flask rodando em http://localhost:5000 (ajuste variáveis se necessário)
+- O proxy do Vite (`VITE_API_PROXY_TARGET`) é essencial para o funcionamento em desenvolvimento
+- O fluxo de autenticação e registro é totalmente integrado ao backend e ao Clerk
 - Para customização, consulte os componentes e hooks na pasta `src/`
-- O fluxo de autenticação e registro é totalmente integrado ao backend e Clerk
