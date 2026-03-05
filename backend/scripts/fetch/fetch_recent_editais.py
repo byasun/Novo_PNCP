@@ -1,4 +1,15 @@
-"""Busca editais "A Receber/Recebendo Proposta" publicados ou atualizados nos últimos 15 dias."""
+import sys
+import os
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+"""
+Busca editais "A Receber/Recebendo Proposta" publicados ou atualizados nos últimos 15 dias.
+
+Este script busca editais recentes (em aberto para propostas) publicados ou atualizados nos últimos N dias, podendo também buscar os itens relacionados.
+Permite uso via linha de comando para customizar o período e se deve buscar itens.
+"""
 
 import logging
 import os
@@ -8,7 +19,7 @@ from datetime import datetime, timedelta
 import argparse
 
 # Adiciona a pasta raiz (Novo_PNCP) ao PATH para permitir imports do projeto
-# __file__ = scripts/fetch_recent_editais.py -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
+# __file__ = scripts/fetch/fetch_recent_editais.py -> dirname = fetch -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR, request_cancel

@@ -1,4 +1,9 @@
-"""Script para limpar dados antigos do sistema PNCP."""
+"""
+Script para limpar dados antigos do sistema PNCP.
+
+Este script realiza a limpeza dos arquivos de dados do sistema (editais, itens e checkpoint), podendo criar backups antes de remover os arquivos.
+Permite uso via linha de comando para limpar todos os dados ou apenas um tipo específico, com opção de backup.
+"""
 
 import os
 import sys
@@ -12,18 +17,13 @@ from datetime import datetime
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PARENT_DIR = os.path.abspath(os.path.join(ROOT_DIR, ".."))
 
-# Add parent to sys.path se ao executar de scripts/
+# Add parent to sys.path se ao executar de scripts/data/
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-try:
-    from backend.config import DATA_DIR, EDITAIS_CHECKPOINT_FILE
-except ImportError:
-    # Fallback: usar valores padrão
-    DATA_DIR = os.path.join(ROOT_DIR, "data")
-    EDITAIS_CHECKPOINT_FILE = os.path.join(DATA_DIR, ".editais_checkpoint.json")
+from backend.config import DATA_DIR, EDITAIS_CHECKPOINT_FILE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,25 +34,25 @@ logger = logging.getLogger(__name__)
 
 def clean_editais_data(backup=True):
     """
-    Remove arquivo de editais local.
-    
+    Remove o arquivo de editais local, com opção de backup.
     Args:
         backup (bool): Se True, renomeia arquivo com timestamp ao invés de deletar
-    
     Returns:
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
     editais_file = os.path.join(DATA_DIR, 'editais.json')
-    
+    backup_dir = os.path.join(DATA_DIR, 'backup_editais')
+    os.makedirs(backup_dir, exist_ok=True)
+
     if not os.path.exists(editais_file):
         msg = f"Arquivo de editais não encontrado: {editais_file}"
         logger.info(msg)
         return {'success': True, 'file_path': editais_file, 'message': msg}
-    
+
     try:
         if backup:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(DATA_DIR, f'editais_backup_{timestamp}.json')
+            backup_file = os.path.join(backup_dir, f'editais.json_{timestamp}')
             os.rename(editais_file, backup_file)
             msg = f"Arquivo de editais movido para backup: {backup_file}"
             logger.info(msg)
@@ -62,7 +62,7 @@ def clean_editais_data(backup=True):
             msg = f"Arquivo de editais deletado: {editais_file}"
             logger.info(msg)
             return {'success': True, 'file_path': editais_file, 'message': msg}
-    
+
     except Exception as e:
         msg = f"Erro ao limpar editais: {e}"
         logger.error(msg)
@@ -71,25 +71,25 @@ def clean_editais_data(backup=True):
 
 def clean_itens_data(backup=True):
     """
-    Remove arquivo de itens local.
-    
+    Remove o arquivo de itens local, com opção de backup.
     Args:
         backup (bool): Se True, renomeia arquivo com timestamp ao invés de deletar
-    
     Returns:
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
     itens_file = os.path.join(DATA_DIR, 'itens.json')
-    
+    backup_dir = os.path.join(DATA_DIR, 'backup_itens')
+    os.makedirs(backup_dir, exist_ok=True)
+
     if not os.path.exists(itens_file):
         msg = f"Arquivo de itens não encontrado: {itens_file}"
         logger.info(msg)
         return {'success': True, 'file_path': itens_file, 'message': msg}
-    
+
     try:
         if backup:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(DATA_DIR, f'itens_backup_{timestamp}.json')
+            backup_file = os.path.join(backup_dir, f'itens.json_{timestamp}')
             os.rename(itens_file, backup_file)
             msg = f"Arquivo de itens movido para backup: {backup_file}"
             logger.info(msg)
@@ -99,7 +99,7 @@ def clean_itens_data(backup=True):
             msg = f"Arquivo de itens deletado: {itens_file}"
             logger.info(msg)
             return {'success': True, 'file_path': itens_file, 'message': msg}
-    
+
     except Exception as e:
         msg = f"Erro ao limpar itens: {e}"
         logger.error(msg)
@@ -108,11 +108,9 @@ def clean_itens_data(backup=True):
 
 def clean_checkpoint(backup=True):
     """
-    Remove arquivo de checkpoint de paginação.
-    
+    Remove o arquivo de checkpoint de paginação, com opção de backup.
     Args:
         backup (bool): Se True, renomeia arquivo com timestamp ao invés de deletar
-    
     Returns:
         dict: {'success': bool, 'file_path': str, 'message': str}
     """
@@ -145,11 +143,9 @@ def clean_checkpoint(backup=True):
 
 def clean_all_data(backup=True):
     """
-    Remove todos os dados del sistema (editais, itens e checkpoint).
-    
+    Remove todos os dados do sistema (editais, itens e checkpoint), com opção de backup.
     Args:
         backup (bool): Se True, cria backups ao invés de deletar
-    
     Returns:
         dict: Resultados de cada limpeza
     """
@@ -179,7 +175,9 @@ def clean_all_data(backup=True):
 
 
 def print_summary(results):
-    """Exibe resumo da limpeza de forma legível."""
+    """
+    Exibe resumo da limpeza de forma legível para o usuário.
+    """
     print("\n" + "=" * 70)
     print("RESUMO DA LIMPEZA DE DADOS")
     print("=" * 70)
@@ -197,7 +195,9 @@ def print_summary(results):
 
 
 def signal_handler(signum, frame):
-    """Handler para Ctrl+C - sai graciosamente."""
+    """
+    Handler para Ctrl+C - finaliza o script de forma amigável.
+    """
     print("\n\n⚠️  Interrupção solicitada (Ctrl+C). Finalizando...")
     sys.exit(0)
 
@@ -205,9 +205,8 @@ def signal_handler(signum, frame):
 if __name__ == "__main__":
     # Registra handler para Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
-    
+    # Argumentos de linha de comando para controle de backup e tipo de limpeza
     import argparse
-    
     parser = argparse.ArgumentParser(
         description='Limpa dados antigos do sistema PNCP'
     )
@@ -222,10 +221,9 @@ if __name__ == "__main__":
         default='all',
         help='Tipo de dados a limpar (padrão: all)'
     )
-    
     args = parser.parse_args()
     backup = not args.no_backup
-    
+    # Executa a limpeza conforme o tipo solicitado
     if args.type == 'all':
         results = clean_all_data(backup=backup)
         print_summary(results)

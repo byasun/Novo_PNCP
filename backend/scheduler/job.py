@@ -1,4 +1,10 @@
-"""Agendador de atualização de editais (job diário e incremental)."""
+"""
+Agendador de atualização de editais (job diário e incremental).
+
+Este módulo define a classe DailyJob, responsável por agendar e executar atualizações automáticas
+de editais e itens do PNCP, exportando os dados periodicamente.
+Utiliza APScheduler para agendamento em background.
+"""
 
 import logging
 import uuid
@@ -8,11 +14,15 @@ from apscheduler.triggers.cron import CronTrigger
 from backend.services.editais_service import EditaisService
 from backend.services.itens_service import ItensService
 from backend.export.exporter import Exporter
-from backend.config import SCHEDULER_HOUR, SCHEDULER_MINUTE
+from backend.config import SCHEDULER_HOUR, SCHEDULER_MINUTE, ITEMS_SKIP_EXISTING
 
 logger = logging.getLogger(__name__)
 
 class DailyJob:
+    """
+    Classe responsável por agendar e executar o job diário de atualização de editais e itens.
+    Garante que apenas uma execução ocorra por vez e exporta os dados ao final do processo.
+    """
     def __init__(self):
         # Scheduler em background
         self.scheduler = BackgroundScheduler()
@@ -24,18 +34,22 @@ class DailyJob:
         # IDs para rastrear execuções (ex.: via API)
         self.current_update_id = None
         self.last_completed_update_id = None
-    
+
     def run_daily_update(self):
+        """
+        Executa a atualização diária dos editais e itens.
+        Evita execuções concorrentes e exporta os dados ao final.
+        """
         # Evita execuções concorrentes
         if self.is_running:
-            logger.warning("Job already running, skipping...")
+            logger.warning("Job já está em execução, pulando...")
             return
-        
+
         self.is_running = True
         # Identificador único desta execução
         self.current_update_id = str(uuid.uuid4())
         logger.info("=" * 50)
-        logger.info("Starting daily update job...")
+        logger.info("Iniciando job de atualização diária...")
         logger.info("=" * 50)
         
         try:
@@ -46,7 +60,8 @@ class DailyJob:
             # for proposal reception period, NOT the search date. Use end of 2026
             # to get ALL editais that are currently open for receiving proposals.
             data_final = "20261231"  # December 31, 2026 - includes all open editais
-            
+
+            # Busca e salva todos os editais filtrados
             self.editais_service.sync_editais(
                 data_inicial=None,  # No initial date limit - fetch ALL editais
                 data_final=data_final,      # Far future date to include all open proposals
@@ -54,7 +69,30 @@ class DailyJob:
                 filter_by_publication_date=True,  # ✅ Client-side filter: last 15 days
                 days_publication=15
             )
-            
+
+            # Remove editais e itens cujo prazo de propostas já expirou
+            logger.info("Removendo editais e itens expirados...")
+            result = self.editais_service.remove_expired_editais()
+            logger.info(f"Limpeza de expirados: {result}")
+
+            # Após salvar todos os editais, busca itens
+            # Usa ITEMS_SKIP_EXISTING do .env para decidir se pula editais com itens já salvos
+            from backend.storage.data_manager import DataManager
+            data_manager = DataManager()
+            editais = data_manager.load_editais()
+            logger.info(f"Buscando itens para editais (de {len(editais)} editais, ITEMS_SKIP_EXISTING={ITEMS_SKIP_EXISTING})...")
+            self.editais_service.fetch_itens_for_all_editais(editais)
+            logger.info("Busca de itens concluída.")
+
+            # Regenera arquivos de exportação (CSV/XLSX) com dados atualizados
+            try:
+                editais_updated = data_manager.load_editais()
+                logger.info("Regenerating export files after daily update...")
+                self.exporter.export_editais(editais_updated)
+                logger.info("Export files regenerated successfully.")
+            except Exception as export_err:
+                logger.warning(f"Failed to regenerate export files: {export_err}")
+
             self.last_run = datetime.now()
             logger.info(f"Daily update completed at {self.last_run}")
             
@@ -119,6 +157,18 @@ class DailyJob:
                 codigo_modalidade=6
             )
             logger.info(f"Incremental sync completed: {summary}")
+
+            # Regenera arquivos de exportação (CSV/XLSX) com dados atualizados
+            try:
+                from backend.storage.data_manager import DataManager
+                data_manager = DataManager()
+                editais_updated = data_manager.load_editais()
+                logger.info("Regenerating export files after incremental update...")
+                self.exporter.export_editais(editais_updated)
+                logger.info("Export files regenerated successfully.")
+            except Exception as export_err:
+                logger.warning(f"Failed to regenerate export files: {export_err}")
+
             self.last_run = datetime.now()
         except Exception as e:
             logger.error(f"Error in incremental update job: {e}")

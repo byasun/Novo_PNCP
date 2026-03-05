@@ -1,17 +1,23 @@
-"""Teste de integração para validar modalidades na API PNCP."""
+
+"""
+Teste de integração para validar modalidades na API PNCP.
+Executa requisições para diferentes códigos de modalidade e exibe o resultado.
+"""
 
 #!/usr/bin/env python3
 import os
 import requests
 from dotenv import load_dotenv
 
+# Carrega variáveis de ambiente do backend
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "backend", ".env"))
 
+# Obtém a URL base da API
 API_BASE_URL = os.getenv("API_BASE_URL")
 if not API_BASE_URL:
     raise RuntimeError("Missing API_BASE_URL in backend/.env")
 
-# Testa diferentes códigos de modalidade
+# Testa diferentes códigos de modalidade de contratação
 for codigo in range(1, 10):
     r = requests.get(
         f'{API_BASE_URL}/contratacoes/publicacao',
@@ -22,7 +28,8 @@ for codigo in range(1, 10):
             'pagina': '1'
         }
     )
-    
+
+    # Analisa resposta da API
     if r.status_code == 200:
         data = r.json()
         if data.get('data'):

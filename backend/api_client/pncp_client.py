@@ -9,13 +9,17 @@ from backend.config import (
     RETRY_BACKOFF_MULTIPLIER, EDITAIS_CHECKPOINT_FILE, request_cancel, reset_cancel, is_cancelled
 )
 
+
+# Logger para registrar eventos e erros do cliente PNCP
 logger = logging.getLogger(__name__)
 
-
 class PNCPClient:
-    """Cliente HTTP para a API do PNCP.
+    """
+    Cliente HTTP para a API do PNCP.
 
-    Centraliza requisições, tratamento de erros, retry e checkpoint de paginação.
+    Este cliente centraliza as requisições para a API do PNCP, incluindo tratamento de erros,
+    tentativas automáticas com backoff exponencial, checkpoint de paginação e integração com
+    arquivos locais para persistência do progresso.
     """
     def __init__(self):
         # URLs base para endpoints de editais/contratações e itens
@@ -29,27 +33,35 @@ class PNCPClient:
         })
     
     def _get_last_checkpoint_page(self):
-        """Carrega a última página salva no checkpoint de editais."""
+        """
+        Carrega a última página salva no arquivo de checkpoint de editais.
+        Retorna 1 caso não exista checkpoint salvo.
+        """
         if os.path.exists(EDITAIS_CHECKPOINT_FILE):
             try:
                 with open(EDITAIS_CHECKPOINT_FILE, 'r') as f:
                     data = json.load(f)
                     return data.get('last_checkpoint_page', 1)
             except Exception as e:
-                logger.warning(f"Error reading checkpoint file: {e}")
+                logger.warning(f"Erro ao ler arquivo de checkpoint: {e}")
         return 1
     
     def _save_checkpoint_page(self, page):
-        """Salva a página atual no checkpoint de editais."""
+        """
+        Salva a página atual no arquivo de checkpoint de editais.
+        Permite retomar a coleta a partir do último progresso salvo.
+        """
         try:
             os.makedirs(os.path.dirname(EDITAIS_CHECKPOINT_FILE) or '.', exist_ok=True)
             with open(EDITAIS_CHECKPOINT_FILE, 'w') as f:
                 json.dump({'last_checkpoint_page': page}, f)
         except Exception as e:
-            logger.error(f"Error saving checkpoint file: {e}")
+            logger.error(f"Erro ao salvar arquivo de checkpoint: {e}")
     
     def _calculate_backoff_delay(self, attempt, base_delay=None):
-        """Calcula delay com backoff exponencial para retries."""
+        """
+        Calcula o tempo de espera (delay) usando backoff exponencial para tentativas de retry.
+        """
         if base_delay is None:
             base_delay = RETRY_DELAY
         return base_delay * (RETRY_BACKOFF_MULTIPLIER ** attempt)
@@ -57,7 +69,8 @@ class PNCPClient:
     def _handle_rate_limit(self, response, attempt):
         """
         Trata erro 429 (Too Many Requests) com backoff inteligente.
-        Respeita o header Retry-After se presente.
+        Se o servidor retornar o header Retry-After, respeita o tempo sugerido.
+        Caso contrário, utiliza backoff exponencial mais agressivo.
         """
         # Tenta obter o tempo de espera do header Retry-After
         retry_after = response.headers.get('Retry-After')
@@ -68,14 +81,16 @@ class PNCPClient:
                 return wait_time
             except ValueError:
                 pass
-        
         # Se não tiver Retry-After, usa backoff exponencial mais agressivo
         wait_time = self._calculate_backoff_delay(attempt, base_delay=RETRY_DELAY * 2)
-        logger.warning(f"Rate limited (429). Using exponential backoff: {wait_time:.1f}s")
+        logger.warning(f"Rate limited (429). Usando backoff exponencial: {wait_time:.1f}s")
         return wait_time
     
     def _make_request(self, endpoint, params=None):
-        # Requisição GET com retry, backoff exponencial e tratamento de rate limit
+        """
+        Realiza uma requisição GET com tentativas automáticas, backoff exponencial e tratamento de rate limit.
+        Retorna a resposta da API ou lança exceção após exceder o número máximo de tentativas.
+        """
         url = f"{self.base_url}{endpoint}"
         for attempt in range(MAX_RETRIES):
             try:
@@ -137,30 +152,28 @@ class PNCPClient:
             logger.error(f"Error fetching itens for contrato {cnpj}/{ano}/{sequencial}: {e}")
             return []
     
-    def get_itens_edital(self, cnpj, ano, numero):
-        """Obtém itens de um edital/contratação (endpoint não paginado)."""
-        endpoint = f"/orgaos/{cnpj}/compras/{ano}/{numero}"
-        try:
-            result = self._make_request(endpoint)
-            if result and isinstance(result, dict):
-                # Try to get itens from the response
-                itens = result.get("itens", result.get("items", []))
-                return itens if isinstance(itens, list) else []
-            return []
-        except Exception as e:
-            logger.error(f"Error fetching itens for edital {cnpj}/{ano}/{numero}: {e}")
-            return []
+    def get_itens_edital(self, cnpj, ano, sequencial):
+        """Obtém todos os itens de um edital (busca paginada completa)."""
+        all_itens = []
+        page = 1
+        while True:
+            page_items = self.get_itens_edital_paginated(cnpj, ano, sequencial, page=page)
+            if not page_items:
+                break
+            all_itens.extend(page_items)
+            page += 1
+        return all_itens
 
-    def get_itens_edital_count(self, cnpj, ano, mes):
-        """Retorna a quantidade de itens para um edital em um mês específico."""
-        endpoint = f"/orgaos/{cnpj}/compras/{ano}/{mes}/itens/quantidade"
+    def get_itens_edital_count(self, cnpj, ano, sequencial):
+        """Retorna a quantidade de itens para um edital (por cnpj/ano/sequencialCompra)."""
+        endpoint = f"/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens/quantidade"
         url = f"{self.items_base_url}{endpoint}"
         for attempt in range(MAX_RETRIES):
             try:
                 response = self.session.get(url, timeout=30)
                 # If endpoint doesn't exist for this orgao/period, return 0 without retrying
                 if response.status_code == 404:
-                    logger.debug(f"Items count endpoint not found for {cnpj}/{ano}/{mes} (404)")
+                    logger.debug(f"Items count endpoint not found for {cnpj}/{ano}/{sequencial} (404)")
                     return 0
                 
                 # Tratamento de rate limiting (429)
@@ -185,9 +198,9 @@ class PNCPClient:
                     logger.error(f"All retries failed for {url}")
                     return 0
 
-    def get_itens_edital_paginated(self, cnpj, ano, mes, page=1, size=PAGE_SIZE):
-        """Obtém itens paginados de um edital por período (mês)."""
-        endpoint = f"/orgaos/{cnpj}/compras/{ano}/{mes}/itens"
+    def get_itens_edital_paginated(self, cnpj, ano, sequencial, page=1, size=PAGE_SIZE):
+        """Obtém itens paginados de um edital (por cnpj/ano/sequencialCompra)."""
+        endpoint = f"/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens"
         url = f"{self.items_base_url}{endpoint}"
         params = {"pagina": page, "tamanhoPagina": size}
         
@@ -196,7 +209,7 @@ class PNCPClient:
                 response = self.session.get(url, params=params, timeout=30)
                 # If the items endpoint doesn't exist for this orgao/period, treat as no items
                 if response.status_code == 404:
-                    logger.debug(f"Items endpoint not found for {cnpj}/{ano}/{mes} (404)")
+                    logger.debug(f"Items endpoint not found for {cnpj}/{ano}/{sequencial} (404)")
                     return []
                 
                 # Tratamento de rate limiting (429)
@@ -351,6 +364,13 @@ class PNCPClient:
         
         # Get starting page from checkpoint
         last_checkpoint_page = self._get_last_checkpoint_page()
+        
+        # Se checkpoint é maior que total de páginas, está obsoleto — reseta
+        if last_checkpoint_page > total_pages:
+            logger.info(f"Checkpoint obsoleto (page {last_checkpoint_page} > total {total_pages}). Reiniciando do início.")
+            last_checkpoint_page = 1
+            self._save_checkpoint_page(1)
+        
         start_page = max(2, last_checkpoint_page) if last_checkpoint_page > 1 else 2
         
         if start_page > 2:
@@ -391,7 +411,7 @@ class PNCPClient:
                     futures = {executor.submit(fetch_page, page): page for page in batch}
                     
                     try:
-                        for future in as_completed(futures, timeout=60):
+                        for future in as_completed(futures, timeout=180):
                             if is_cancelled():
                                 break
                             page_num = futures[future]
@@ -400,11 +420,16 @@ class PNCPClient:
                                 if page_data:
                                     all_editais.extend(page_data)
                                 pages_fetched += 1
-                                
                                 if pages_fetched % 10 == 0:
                                     logger.info(f"Progress: {pages_fetched + 1}/{total_pages} pages, {len(all_editais)} editais collected")
                             except Exception as e:
                                 logger.error(f"Error fetching page {page_num}: {e}")
+                    except TimeoutError as te:
+                        unfinished = [futures[f] for f in futures if not f.done()]
+                        logger.error(f"Timeout: {len(unfinished)} (of {len(futures)}) futures unfinished: {unfinished}")
+                        # Salva progresso parcial
+                        cancelled = True
+                        break
                     except KeyboardInterrupt:
                         logger.warning("\nInterrupção solicitada! Cancelando operações...")
                         request_cancel()
@@ -446,6 +471,9 @@ class PNCPClient:
                         on_checkpoint(all_editais, pages_fetched + start_page)
                     except Exception as e:
                         logger.error(f"Error in final checkpoint callback: {e}")
+        else:
+            # Busca completa — reseta checkpoint para próxima execução começar do zero
+            self._save_checkpoint_page(1)
         
         logger.info(f"Finished fetching editais. Total collected: {len(all_editais)}")
         return all_editais

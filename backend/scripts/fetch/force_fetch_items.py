@@ -1,13 +1,19 @@
-"""Força a coleta de itens para todos os editais salvos localmente."""
+"""
+Força a coleta de itens para todos os editais salvos localmente.
+
+Este script executa a busca de itens para todos os editais já presentes no armazenamento local, independentemente do status ou data.
+Útil para garantir que todos os itens estejam atualizados ou para forçar a sincronização completa.
+"""
 import logging
 import os
 import sys
 import signal
 from datetime import datetime
 
-# Adiciona a pasta raiz (Novo_PNCP) ao PATH para permitir imports do projeto
-# __file__ = scripts/force_fetch_items.py -> dirname = scripts -> dirname = backend -> dirname = Novo_PNCP
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Garante que o diretório raiz do projeto esteja no sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from backend.config import LOG_LEVEL, LOG_FORMAT, LOGS_DIR, request_cancel
 
@@ -32,6 +38,9 @@ import time
 
 
 def main():
+    """
+    Função principal que força a coleta de itens para todos os editais salvos localmente.
+    """
     # Cabeçalho de execução
     logger.info("=" * 70)
     logger.info("FORCING ITEM FETCH FOR ALL EDITAIS")
@@ -40,7 +49,7 @@ def main():
     data_manager = DataManager()
     editais_service = EditaisService()
     
-    # Load all editais from storage
+    # Carrega todos os editais do armazenamento local
     editais = data_manager.load_editais()
     logger.info(f"Loaded {len(editais)} editais from local storage")
     
@@ -48,7 +57,7 @@ def main():
         logger.warning("No editais found in storage. Run main.py first to fetch editais.")
         return
     
-    # Force fetch items for all editais
+    # Força a busca de itens para todos os editais
     start_time = datetime.now()
     logger.info(f"Starting item fetch at {start_time}...")
     
@@ -68,7 +77,8 @@ def main():
         if all_itens:
             logger.info(f"\nSample items (first 5):")
             for i, item in enumerate(all_itens[:5], start=1):
-                logger.info(f"  {i}. {item.get('descricao', 'N/A')[:60]}... (edital: {item.get('edital_cnpj')}/{item.get('edital_ano')}/{item.get('edital_numero')})")
+                identificador = item.get('edital_numeroControlePNCP') or item.get('edital_ID_C_PNCP') or f"{item.get('edital_cnpj')}/{item.get('edital_ano')}/{item.get('edital_numero')}"
+                logger.info(f"  {i}. {item.get('descricao', 'N/A')[:60]}... (edital: {identificador})")
         
     except Exception as e:
         logger.exception(f"Error during item fetch: {e}")

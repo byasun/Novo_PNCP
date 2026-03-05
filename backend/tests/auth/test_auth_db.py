@@ -1,4 +1,9 @@
-"""Testes unitários do CRUD de usuários."""
+"""
+Testes unitários do CRUD de usuários.
+
+Este módulo testa as operações de criação, autenticação, busca e atualização de usuários
+no banco de dados, garantindo o correto funcionamento do sistema de autenticação.
+"""
 
 from backend.storage.auth_db import (
     init_db,

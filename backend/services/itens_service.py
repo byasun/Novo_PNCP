@@ -1,4 +1,9 @@
-"""Serviço de itens de contratos (camada de negócio)."""
+"""
+Serviço de itens de contratos (camada de negócio).
+
+Este módulo implementa a classe ItensService, responsável por buscar e gerenciar
+os itens vinculados a contratos do PNCP, tanto via API quanto no armazenamento local.
+"""
 
 import logging
 from backend.api_client.pncp_client import PNCPClient
@@ -7,6 +12,10 @@ from backend.storage.data_manager import DataManager
 logger = logging.getLogger(__name__)
 
 class ItensService:
+    """
+    Serviço para gerenciamento de itens de contratos do PNCP.
+    Realiza busca, vinculação e persistência local dos itens.
+    """
     def __init__(self):
         # Cliente da API e gerenciador de dados locais
         self.client = PNCPClient()

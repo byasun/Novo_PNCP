@@ -1,4 +1,8 @@
-"""Reexporta configurações para compatibilidade retroativa."""
+"""
+Módulo de configuração do sistema PNCP.
+
+Este arquivo reexporta variáveis e funções de configuração do settings.py para manter compatibilidade retroativa e facilitar o acesso centralizado às configurações globais do sistema.
+"""
 
 # Reexporta variáveis de configuração para outros módulos
 from .settings import (

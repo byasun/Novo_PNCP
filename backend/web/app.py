@@ -1,13 +1,23 @@
-"""Aplicação web Flask (API + SPA React)."""
+"""
+Aplicação web Flask (API + SPA React).
+
+Este módulo implementa a aplicação web principal do sistema PNCP,
+incluindo endpoints de API, autenticação Clerk, integração com o frontend React
+e gerenciamento de sessões de usuário.
+"""
+
+import os
+import re
+import logging
+from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, send_file, request, send_from_directory
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_wtf.csrf import CSRFProtect
-import os
-import logging
-from datetime import datetime, timedelta
-import re
+
+import backend.storage.auth_db as auth_db
+from backend.web.clerk_auth import clerk_login_required
 from backend.services.editais_service import EditaisService
 from backend.storage.data_manager import DataManager
 from backend.storage.auth_db import (
@@ -32,12 +42,17 @@ from backend.export.exporter import Exporter
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Inicialização do Flask app
+# ---------------------------------------------------------------------------
+
 WEB_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(WEB_DIR, "..", ".."))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 REACT_DIST_DIR = os.path.join(FRONTEND_DIR, "react", "dist")
 
-app = Flask(__name__, static_folder=REACT_DIST_DIR, static_url_path="/assets")
+app = Flask(__name__, static_folder=REACT_DIST_DIR)
+
 # CORS para frontend separado (React)
 allowed_origins_env = os.getenv("PNCP_FRONTEND_ORIGINS", "")
 allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
@@ -52,6 +67,7 @@ CORS(
     },
     supports_credentials=True,
 )
+
 # Permite URLs com e sem "/" no final
 app.url_map.strict_slashes = False
 app.config["SECRET_KEY"] = SECRET_KEY
@@ -137,12 +153,58 @@ def add_header(response):
     response.headers["Expires"] = "0"
     return response
 
+# ---------------------------------------------------------------------------
+# Rotas Clerk (autenticação JWT)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/register-clerk-user", methods=["POST"])
+@clerk_login_required
+def register_clerk_user():
+    """Registra usuário Clerk autenticado no banco local."""
+    user = getattr(request, "clerk_user", {})
+    clerk_id = user.get("sub")
+    email = user.get("email")
+    name = user.get("name") or user.get("given_name")
+    if not clerk_id or not email:
+        return {"error": "Dados insuficientes do Clerk"}, 400
+    if auth_db.user_exists(clerk_id):
+        return {"message": "Usuário já registrado", "clerk_id": clerk_id}, 200
+    auth_db.create_user(clerk_id, email, name)
+    return {"message": "Usuário registrado com sucesso", "clerk_id": clerk_id}, 201
+
+
+@app.route("/api/clerk-status")
+@clerk_login_required
+def api_clerk_status():
+    """Status do usuário Clerk autenticado."""
+    user = getattr(request, "clerk_user", {})
+    return jsonify({
+        "status": "authenticated",
+        "clerk_id": user.get("sub"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "username": user.get("username"),
+        "user": user
+    })
+
+
+@app.route("/api/secure-clerk")
+@clerk_login_required
+def api_secure_clerk():
+    """Endpoint de exemplo protegido por Clerk JWT."""
+    user = getattr(request, "clerk_user", {})
+    return jsonify({"message": "Acesso autorizado via Clerk!", "user": user})
+
+# ---------------------------------------------------------------------------
+# Rotas de dados (editais, itens, status)
+# ---------------------------------------------------------------------------
+
 @app.route("/")
 def spa():
     return _serve_spa()
 
 @app.route("/api/editais")
-@login_required
+@clerk_login_required
 def api_editais():
     # Retorna editais em JSON
     editais = editais_service.get_all_editais_local()
@@ -150,7 +212,7 @@ def api_editais():
 
 
 @app.route("/api/editais/<path:edital_key>")
-@login_required
+@clerk_login_required
 def api_edital_detail(edital_key):
     parts = edital_key.split("_")
     if len(parts) != 3:
@@ -162,24 +224,36 @@ def api_edital_detail(edital_key):
 
 
 @app.route("/api/editais/<path:edital_key>/itens")
-@login_required
+@clerk_login_required
 def api_edital_itens(edital_key):
-    parts = edital_key.split("_")
-    if len(parts) != 3:
+    # Busca itens por ID_C_PNCP (vinculo único)
+    edital = editais_service.get_edital_by_key(edital_key)
+    if not edital:
         return jsonify({"error": "Edital não encontrado"}), 404
-    cnpj, ano, numero = parts
-    itens = editais_service.get_itens_by_edital(cnpj, ano, numero)
+    id_c_pncp = edital.get("ID_C_PNCP")
+    if not id_c_pncp:
+        return jsonify({"error": "Edital sem ID_C_PNCP"}), 404
+    itens = editais_service.get_itens_by_edital_id(id_c_pncp)
     return jsonify({"total": len(itens), "data": itens})
 
+
+@app.route("/api/itens/<path:id_c_pncp>")
+@clerk_login_required
+def api_itens_by_id_c_pncp(id_c_pncp):
+    # Busca itens diretamente por ID_C_PNCP
+    itens = editais_service.get_itens_by_edital_id(id_c_pncp)
+    return jsonify({"total": len(itens), "data": itens})
+
+
 @app.route("/api/editais/count")
-@login_required
+@clerk_login_required
 def api_editais_count():
     """Retorna apenas a contagem de editais (tempo real)."""
     editais = editais_service.get_all_editais_local()
     return jsonify({"total": len(editais)})
 
 @app.route("/api/status")
-@login_required
+@clerk_login_required
 def api_status():
     # Status da aplicação e do scheduler
     editais = editais_service.get_all_editais_local()
@@ -225,25 +299,23 @@ def trigger_update():
     return jsonify({"status": "error", "message": "Scheduler not available"}), 500
 
 @app.route("/download/<filename>")
-@login_required
+@clerk_login_required
 def download_file(filename):
-    # Download de arquivos CSV/XLSX exportados
+    # Download de arquivos CSV/XLSX exportados (gerados no startup/background)
     allowed_files = ["editais.csv", "editais.xlsx"]
     if filename not in allowed_files:
         return jsonify({"error": "File not found"}), 404
-    # Build absolute path to data directory
     file_path = os.path.join(DATA_DIR, filename)
-    # If file does not exist, try to generate it from current data
     if not os.path.exists(file_path):
+        # Se o arquivo ainda não existe, tenta gerar sob demanda
         try:
-            # Export editais to requested format
             editais = data_manager.load_editais()
             exporter.export_editais(editais)
         except Exception as e:
             logger.error(f"Error generating export file {filename}: {e}")
+            return jsonify({"error": "File not available yet. Export is still running, try again in a few seconds."}), 503
     if not os.path.exists(file_path):
-        return jsonify({"error": "File not available yet"}), 404
-    
+        return jsonify({"error": "File not available yet. Export is still running, try again in a few seconds."}), 503
     return send_file(file_path, as_attachment=True)
 
 
@@ -273,10 +345,13 @@ def login():
 
 
 @app.route("/logout", methods=["POST", "GET"])
-@login_required
 @csrf.exempt
 def logout():
-    logout_user()
+    # Suporta logout tanto de sessão Flask-Login quanto de Clerk
+    try:
+        logout_user()
+    except Exception:
+        pass
     return jsonify({"status": "success", "message": "Logged out"})
 
 
@@ -340,6 +415,7 @@ def serve_assets(filename):
 
 @app.route("/<path:path>")
 def serve_spa_fallback(path):
+    """Serve index.html para qualquer rota não-API (SPA fallback)."""
     full_path = os.path.join(REACT_DIST_DIR, path)
     if os.path.exists(full_path) and os.path.isfile(full_path):
         return send_from_directory(REACT_DIST_DIR, path)

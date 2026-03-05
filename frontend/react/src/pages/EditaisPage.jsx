@@ -1,0 +1,189 @@
+import { useClerkApi } from '../hooks/useClerkApi';
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { formatCNPJ, getEditalCnpj, getEditalRazaoSocial, getEditalObjeto, getEditalKey, formatCurrencyBRL, fetchJson } from '../App'
+import { useAuth } from '../App';
+
+import { Table, TableHead, TableRow } from '../components/Table'
+
+// Página principal de listagem de editais.
+// Exibe todos os editais disponíveis para o usuário autenticado.
+// Permite busca, atualização manual e navegação para detalhes.
+const EditaisPage = () => {
+  const { authStatus, statusInfo, refreshStatus, setMessage, clerkToken } = useAuth();
+  const [loading, setLoading] = useState(false)
+  const [editais, setEditais] = useState([])
+  const [search, setSearch] = useState('')
+  const navigate = useNavigate();
+
+  // Redireciona para login se não autenticado
+  React.useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      navigate('/login');
+    }
+  }, [authStatus, navigate]);
+
+  // Busca editais do backend usando Clerk
+  const fetchWithClerk = useClerkApi();
+  const loadEditais = useCallback(async () => {
+    if (authStatus !== 'authenticated' || !clerkToken) return;
+    try {
+      const data = await fetchWithClerk('/api/editais')
+      setEditais(data.data || [])
+    } catch (err) {
+      setMessage(err.message)
+    }
+  }, [setMessage, authStatus, clerkToken, fetchWithClerk])
+
+  // Carrega editais ao montar a página
+  useEffect(() => {
+    loadEditais()
+  }, [loadEditais, clerkToken])
+
+  // Dispara atualização manual dos editais
+  const handleTriggerUpdate = async () => {
+    setLoading(true)
+    setMessage('')
+    try {
+      const data = await fetchJson('/api/trigger-update', { method: 'POST' })
+      setMessage(data.message || 'Atualização iniciada.')
+      await refreshStatus()
+    } catch (err) {
+      setMessage(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Download autenticado de CSV/XLSX
+  const handleDownload = async (filename) => {
+    try {
+      if (!clerkToken) throw new Error('Usuário não autenticado');
+      const res = await fetch(`/download/${filename}`, {
+        headers: { Authorization: `Bearer ${clerkToken}` },
+      });
+      if (!res.ok) throw new Error('Erro ao baixar arquivo');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage(err.message);
+    }
+  }
+
+  // Filtro de busca
+  const filteredEditais = useMemo(() => {
+    if (!search) return editais
+    const term = search.toLowerCase()
+    return editais.filter((edital) => {
+      const processo = edital?.processo || ''
+      const cnpj = getEditalCnpj(edital)
+      const razaoSocial = getEditalRazaoSocial(edital)
+      const objeto = getEditalObjeto(edital)
+      return (
+        (processo || '').toLowerCase().includes(term) ||
+        (cnpj || '').toLowerCase().includes(term) ||
+        (razaoSocial || '').toLowerCase().includes(term) ||
+        (objeto || '').toLowerCase().includes(term) ||
+        String(edital?.valorTotalEstimado ?? '').toLowerCase().includes(term)
+      )
+    })
+  }, [editais, search])
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="stack">
+      <div className="card card--inline">
+        <div>
+          <h2>Status</h2>
+          <p>Total de editais: {statusInfo?.total_editais ?? editais.length}</p>
+          <p>Última atualização: {formatDateTime(statusInfo?.last_update)}</p>
+        </div>
+        <div className="actions">
+          <button className="btn" onClick={handleTriggerUpdate} disabled={loading}>
+            Atualizar agora
+          </button>
+          <button className="btn btn--ghost" onClick={() => handleDownload('editais.csv')}>
+            Baixar CSV
+          </button>
+          <button className="btn btn--ghost" onClick={() => handleDownload('editais.xlsx')}>
+            Baixar XLSX
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="table__toolbar">
+          <div>
+            <h2>Editais</h2>
+            <p>Total carregado: {filteredEditais.length}</p>
+          </div>
+          <input
+            className="search"
+            placeholder="Buscar por processo, CNPJ, razão social ou objeto"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+        <Table>
+          <TableHead>
+            <span>CNPJ</span>
+            <span>Razão social</span>
+            <span>Objeto</span>
+            <span>Valor estimado</span>
+          </TableHead>
+          {filteredEditais.map((edital, index) => {
+            const id_c_pncp = edital?.ID_C_PNCP
+            const objeto = getEditalObjeto(edital)
+            const cnpj = formatCNPJ(getEditalCnpj(edital))
+            const razaoSocial = getEditalRazaoSocial(edital)
+            const valorEstimado = edital?.valorTotalEstimado
+            const key = id_c_pncp || edital.id || edital.numero || index
+            const content = (
+              <>
+                <span>{cnpj || '—'}</span>
+                <span>{razaoSocial || '—'}</span>
+                <span>{objeto || '—'}</span>
+                <span>{formatCurrencyBRL(valorEstimado)}</span>
+              </>
+            )
+            if (id_c_pncp) {
+              return (
+                <TableRow key={key} className="table__row--link">
+                  <Link to={`/edital/${id_c_pncp}`} style={{ display: 'contents', color: 'inherit', textDecoration: 'none' }}>
+                    {content}
+                  </Link>
+                </TableRow>
+              )
+            }
+            return (
+              <TableRow key={key}>
+                {content}
+              </TableRow>
+            )
+          })}
+        </Table>
+      </div>
+    </div>
+  )
+}
+
+export default EditaisPage

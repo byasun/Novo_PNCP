@@ -1,12 +1,15 @@
-"""Script para promover/revogar admin de usuários via terminal.
+"""
+Script para promover/revogar admin de usuários via terminal.
 
 Uso:
-    python scripts/set_admin.py <username> [true|false]
-    
+    python scripts/user/set_admin.py <username> [true|false]
+
 Exemplos:
-    python scripts/set_admin.py admin true      # Promove a admin
-    python scripts/set_admin.py admin false     # Remove admin
-    python scripts/set_admin.py admin           # Mostra status atual
+    python scripts/user/set_admin.py admin true      # Promove a admin
+    python scripts/user/set_admin.py admin false     # Remove admin
+    python scripts/user/set_admin.py admin           # Mostra status atual
+
+Este script permite promover ou remover privilégios de administrador de um usuário, ou consultar o status atual, diretamente pelo terminal.
 """
 
 import os
@@ -22,7 +25,9 @@ from backend.storage.auth_db import init_db, get_user_by_username, get_session, 
 
 
 def set_admin_status(username: str, is_admin: bool) -> bool:
-    """Define status de admin para um usuário."""
+    """
+    Define o status de admin para um usuário.
+    """
     with get_session() as session:
         user = session.query(User).filter(User.username == username).first()
         if not user:
@@ -33,12 +38,15 @@ def set_admin_status(username: str, is_admin: bool) -> bool:
 
 
 def main():
+    """
+    Função principal que promove, remove ou consulta o status de admin de um usuário via terminal.
+    """
     if len(sys.argv) < 2:
         print("Uso: python scripts/set_admin.py <username> [true|false]")
         print("Exemplos:")
-        print("  python scripts/set_admin.py admin true   # Promove a admin")
-        print("  python scripts/set_admin.py admin false  # Remove admin")
-        print("  python scripts/set_admin.py admin        # Mostra status atual")
+        print("  python scripts/user/set_admin.py admin true   # Promove a admin")
+        print("  python scripts/user/set_admin.py admin false  # Remove admin")
+        print("  python scripts/user/set_admin.py admin        # Mostra status atual")
         sys.exit(1)
     
     username = sys.argv[1].strip()
