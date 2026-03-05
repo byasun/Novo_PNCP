@@ -55,6 +55,28 @@ const EditaisPage = () => {
     }
   }
 
+  // Download autenticado de CSV/XLSX
+  const handleDownload = async (filename) => {
+    try {
+      if (!clerkToken) throw new Error('Usuário não autenticado');
+      const res = await fetch(`/download/${filename}`, {
+        headers: { Authorization: `Bearer ${clerkToken}` },
+      });
+      if (!res.ok) throw new Error('Erro ao baixar arquivo');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage(err.message);
+    }
+  }
+
   // Filtro de busca
   const filteredEditais = useMemo(() => {
     if (!search) return editais
@@ -99,12 +121,12 @@ const EditaisPage = () => {
           <button className="btn" onClick={handleTriggerUpdate} disabled={loading}>
             Atualizar agora
           </button>
-          <a className="btn btn--ghost" href="/download/editais.csv">
+          <button className="btn btn--ghost" onClick={() => handleDownload('editais.csv')}>
             Baixar CSV
-          </a>
-          <a className="btn btn--ghost" href="/download/editais.xlsx">
+          </button>
+          <button className="btn btn--ghost" onClick={() => handleDownload('editais.xlsx')}>
             Baixar XLSX
-          </a>
+          </button>
         </div>
       </div>
 
