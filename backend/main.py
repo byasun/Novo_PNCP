@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 from backend.web.app import app, set_job
 from backend.storage.data_manager import DataManager
 from backend.scheduler.job import DailyJob
+from backend.export.exporter import Exporter
 
 # Handler para sinais de encerramento (Ctrl+C, SIGTERM)
 
@@ -77,8 +78,7 @@ def main():
     app.config["SECRET_KEY"] = runtime_secret
     logger.info("New session secret generated (previous sessions invalidated)")
 
-    # 1. (Removido) Limpeza automática de editais/itens expirados
-    # (A remoção automática foi desativada para evitar perda de dados)
+    # 1. Limpeza automática de editais/itens expirados é feita no job diário (DailyJob.run_daily_update)
 
     # 2. Verifica se é a primeira inicialização do dia
     try:
@@ -97,13 +97,6 @@ def main():
     editais = data_manager.load_editais()
     logger.info(f"Loaded {len(editais)} editais from local storage")
 
-    # Garante que todos os itens dos editais estejam salvos
-    from backend.services.editais_service import EditaisService
-    editais_service = EditaisService()
-    logger.info("Buscando e salvando itens para todos os editais...")
-    editais_service.fetch_itens_for_all_editais(editais, skip_existing=True)
-    logger.info("Itens de todos os editais garantidos no armazenamento local.")
-
     daily_job = DailyJob()
     set_job(daily_job)
 
@@ -113,6 +106,20 @@ def main():
         daily_job.run_now()
 
     daily_job.start()
+
+    # Gera/atualiza arquivos CSV e XLSX em background (não bloqueia o servidor)
+    import threading
+    def _generate_exports():
+        try:
+            exporter = Exporter()
+            logger.info("[Background] Generating export files (CSV/XLSX)...")
+            exporter.export_editais(editais)
+            logger.info("[Background] Export files generated successfully.")
+        except Exception as e:
+            logger.warning(f"[Background] Failed to generate export files: {e}")
+
+    export_thread = threading.Thread(target=_generate_exports, daemon=True)
+    export_thread.start()
 
     logger.info("Starting Flask web server on port 5000...")
     app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

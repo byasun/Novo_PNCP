@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from backend.services.editais_service import EditaisService
 from backend.services.itens_service import ItensService
 from backend.export.exporter import Exporter
-from backend.config import SCHEDULER_HOUR, SCHEDULER_MINUTE
+from backend.config import SCHEDULER_HOUR, SCHEDULER_MINUTE, ITEMS_SKIP_EXISTING
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +70,28 @@ class DailyJob:
                 days_publication=15
             )
 
-            # Após salvar todos os editais, busca e salva itens de todos os editais filtrados
+            # Remove editais e itens cujo prazo de propostas já expirou
+            logger.info("Removendo editais e itens expirados...")
+            result = self.editais_service.remove_expired_editais()
+            logger.info(f"Limpeza de expirados: {result}")
+
+            # Após salvar todos os editais, busca itens
+            # Usa ITEMS_SKIP_EXISTING do .env para decidir se pula editais com itens já salvos
             from backend.storage.data_manager import DataManager
             data_manager = DataManager()
             editais = data_manager.load_editais()
-            logger.info(f"Buscando e salvando itens para {len(editais)} editais filtrados...")
-            self.editais_service.fetch_itens_for_all_editais(editais, skip_existing=False)
-            logger.info("Itens de todos os editais garantidos no armazenamento local.")
+            logger.info(f"Buscando itens para editais (de {len(editais)} editais, ITEMS_SKIP_EXISTING={ITEMS_SKIP_EXISTING})...")
+            self.editais_service.fetch_itens_for_all_editais(editais)
+            logger.info("Busca de itens concluída.")
+
+            # Regenera arquivos de exportação (CSV/XLSX) com dados atualizados
+            try:
+                editais_updated = data_manager.load_editais()
+                logger.info("Regenerating export files after daily update...")
+                self.exporter.export_editais(editais_updated)
+                logger.info("Export files regenerated successfully.")
+            except Exception as export_err:
+                logger.warning(f"Failed to regenerate export files: {export_err}")
 
             self.last_run = datetime.now()
             logger.info(f"Daily update completed at {self.last_run}")
@@ -142,6 +157,18 @@ class DailyJob:
                 codigo_modalidade=6
             )
             logger.info(f"Incremental sync completed: {summary}")
+
+            # Regenera arquivos de exportação (CSV/XLSX) com dados atualizados
+            try:
+                from backend.storage.data_manager import DataManager
+                data_manager = DataManager()
+                editais_updated = data_manager.load_editais()
+                logger.info("Regenerating export files after incremental update...")
+                self.exporter.export_editais(editais_updated)
+                logger.info("Export files regenerated successfully.")
+            except Exception as export_err:
+                logger.warning(f"Failed to regenerate export files: {export_err}")
+
             self.last_run = datetime.now()
         except Exception as e:
             logger.error(f"Error in incremental update job: {e}")
