@@ -70,10 +70,10 @@ class EditaisService:
             self.save_editais(editais)
             return editais
     
-    def fetch_itens_for_edital(self, cnpj, ano, numero):
-        # Busca itens de um edital específico
-        logger.info(f"Fetching itens for edital {cnpj}/{ano}/{numero}...")
-        itens = self.client.get_itens_edital(cnpj, ano, numero)
+    def fetch_itens_for_edital(self, cnpj, ano, sequencial):
+        # Busca itens de um edital específico (por cnpj/ano/sequencialCompra)
+        logger.info(f"Fetching itens for edital {cnpj}/{ano}/{sequencial}...")
+        itens = self.client.get_itens_edital(cnpj, ano, sequencial)
         return itens if itens else []
 
     def _extract_month_from_edital(self, edital):
@@ -218,7 +218,7 @@ class EditaisService:
         """
         from backend.config import ITEMS_FETCH_THREADS, ITEMS_FETCH_DELAY_PER_THREAD, ITEMS_FETCH_CHECKPOINT, ITEMS_SKIP_EXISTING, is_cancelled
         
-        # Usa configuração do .env se não especificado
+        # Usa configuração do .env se não especificado explicitamente
         if skip_existing is None:
             skip_existing = ITEMS_SKIP_EXISTING
         
@@ -237,7 +237,7 @@ class EditaisService:
             logger.warning("Operação de busca de itens cancelada antes de iniciar.")
             return []
 
-        # Carrega itens existentes para evitar duplicidades apenas de editais (não de itens)
+        # Carrega itens existentes para determinar quais editais já têm itens
         existing_itens = self.data_manager.load_itens()
         existing_edital_keys = set()
         for item in existing_itens:
@@ -272,10 +272,26 @@ class EditaisService:
                 logger.info("All editais already have items saved. Nothing to fetch.")
                 return existing_itens
 
-        logger.info(f"Fetching items for {len(editais)} editais using {ITEMS_FETCH_THREADS} parallel threads...")
+            # No modo incremental, preserva itens existentes
+            all_itens = existing_itens.copy()
+        else:
+            # No modo completo (skip_existing=False), começa do zero
+            all_itens = []
 
-        all_itens = existing_itens.copy()  # Start with existing items
+        logger.info(f"Fetching items for {len(editais)} editais using {ITEMS_FETCH_THREADS} parallel threads...")
         processed_count = 0
+        interrupted = False
+
+        # Registra handler de SIGINT para garantir interrupção no Windows
+        import signal
+        original_handler = signal.getsignal(signal.SIGINT)
+        def _interrupt_handler(signum, frame):
+            nonlocal interrupted
+            interrupted = True
+            from backend.config import request_cancel
+            request_cancel()
+            logger.warning("CTRL+C detectado. Finalizando busca de itens...")
+        signal.signal(signal.SIGINT, _interrupt_handler)
 
         # Usa ThreadPoolExecutor para paralelizar a coleta
         executor = None
@@ -284,7 +300,7 @@ class EditaisService:
             # Submit all tasks
             futures = {}
             for idx, edital in enumerate(editais, start=1):
-                if is_cancelled():
+                if is_cancelled() or interrupted:
                     logger.warning("Cancelamento solicitado. Parando submissão de novas tarefas.")
                     break
                 future = executor.submit(self._fetch_items_for_single_edital, idx, len(editais), edital, ITEMS_FETCH_DELAY_PER_THREAD)
@@ -292,11 +308,11 @@ class EditaisService:
             
             # Collect results as they complete and save incrementally
             for future in as_completed(futures):
-                if is_cancelled():
+                if is_cancelled() or interrupted:
                     logger.warning("Cancelamento solicitado. Parando processamento de resultados.")
                     break
                 try:
-                    itens = future.result()
+                    itens = future.result(timeout=60)
                     # Adiciona todos os itens, sem deduplicação
                     all_itens.extend(itens)
                     processed_count += 1
@@ -314,35 +330,27 @@ class EditaisService:
                     processed_count += 1
 
         except KeyboardInterrupt:
-            # Interrupção manual: salvar progresso parcial
+            interrupted = True
             logger.warning(f"Fetch interrupted by user at {processed_count}/{len(editais)} editais processed")
-            # Wait for all threads to complete before saving
-            if executor:
-                logger.info("Waiting for all threads to complete...")
-                executor.shutdown(wait=True)
-            # Save all collected items before exiting
-            if all_itens:
-                try:
-                    self.data_manager.save_itens(all_itens)
-                    logger.info(f"Interrupted: saved {len(all_itens)} items collected so far")
-                except Exception:
-                    logger.exception("Failed to save items on interruption")
-            raise
         finally:
-            # Ensure executor is shut down
+            # Restaura handler original
+            signal.signal(signal.SIGINT, original_handler)
+            # Cancela futures pendentes e desliga o executor sem esperar
             if executor:
-                try:
-                    executor.shutdown(wait=True)
-                except Exception:
-                    pass
+                for f in futures:
+                    f.cancel()
+                executor.shutdown(wait=False)
 
-        # Salvamento final
+        # Salva progresso (parcial ou completo)
         if all_itens:
             try:
                 self.data_manager.save_itens(all_itens)
-                logger.info(f"Final save: {len(all_itens)} total items saved to storage")
+                if interrupted:
+                    logger.info(f"Interrupted: saved {len(all_itens)} items collected so far")
+                else:
+                    logger.info(f"Final save: {len(all_itens)} total items saved to storage")
             except Exception:
-                logger.exception("Failed to final save itens to local storage")
+                logger.exception("Failed to save itens to local storage")
 
         logger.info(f"Finished fetching items for all editais. Total itens collected: {len(all_itens)}")
         return all_itens
@@ -358,50 +366,41 @@ class EditaisService:
                 return []
             cnpj = (edital.get("orgaoEntidade", {}) or {}).get("cnpj") or edital.get("cnpjOrgao")
             ano = edital.get("anoCompra") or edital.get("ano")
-            numero = edital.get("numeroCompra") or edital.get("numero")
+            sequencial = edital.get("sequencialCompra")
 
-            if not cnpj or not ano or not numero:
-                logger.debug(f"Skipping edital {idx}/{total} with missing identifiers: cnpj={cnpj}, ano={ano}, numero={numero}")
+            if not cnpj or not ano or not sequencial:
+                logger.debug(f"Skipping edital {idx}/{total} with missing identifiers: cnpj={cnpj}, ano={ano}, sequencial={sequencial}")
                 return []
             if is_cancelled():
                 logger.info(f"Thread de edital {idx}/{total} cancelada após checagem de identificadores.")
                 return []
 
-            mes = self._extract_month_from_edital(edital)
             itens = []
-            
-            if not mes:
-                logger.debug(f"Could not determine month for edital {idx}/{total}: {cnpj}/{ano}/{numero}")
-                if is_cancelled():
-                    logger.info(f"Thread de edital {idx}/{total} cancelada antes de buscar itens.")
-                    return []
-                itens = self.client.get_itens_edital(cnpj, ano, numero)
-                itens = itens or []
+
+            # Primeiro, checa quantidade para evitar chamadas desnecessárias
+            item_count = self.client.get_itens_edital_count(cnpj, ano, sequencial)
+            time.sleep(delay_per_request)
+            if is_cancelled():
+                logger.info(f"Thread de edital {idx}/{total} cancelada após checar quantidade.")
+                return []
+            if item_count == 0:
+                logger.debug(f"No items for edital {idx}/{total}: {cnpj}/{ano}/{sequencial} (count=0)")
+                itens = []
             else:
-                # Primeiro, checa quantidade para evitar chamadas desnecessárias
-                item_count = self.client.get_itens_edital_count(cnpj, ano, mes)
-                time.sleep(delay_per_request)
-                if is_cancelled():
-                    logger.info(f"Thread de edital {idx}/{total} cancelada após checar quantidade.")
-                    return []
-                if item_count == 0:
-                    logger.debug(f"No items for edital {idx}/{total}: {cnpj}/{ano}/{mes} (count=0)")
-                    itens = []
-                else:
-                    logger.info(f"Found {item_count} items for edital {idx}/{total}: {cnpj}/{ano}/{mes}")
-                    # Use paginated items endpoint
-                    page = 1
-                    while True:
-                        if is_cancelled():
-                            logger.info(f"Thread de edital {idx}/{total} cancelada durante paginação.")
-                            break
-                        page_items = self.client.get_itens_edital_paginated(cnpj, ano, mes, page=page)
-                        time.sleep(delay_per_request)
-                        if not page_items:
-                            break
-                        itens.extend(page_items)
-                        logger.debug(f"  Edital {idx}/{total}: Page {page}: {len(page_items)} items, total: {len(itens)}")
-                        page += 1
+                logger.info(f"Found {item_count} items for edital {idx}/{total}: {cnpj}/{ano}/{sequencial}")
+                # Use paginated items endpoint
+                page = 1
+                while True:
+                    if is_cancelled():
+                        logger.info(f"Thread de edital {idx}/{total} cancelada durante paginação.")
+                        break
+                    page_items = self.client.get_itens_edital_paginated(cnpj, ano, sequencial, page=page)
+                    time.sleep(delay_per_request)
+                    if not page_items:
+                        break
+                    itens.extend(page_items)
+                    logger.debug(f"  Edital {idx}/{total}: Page {page}: {len(page_items)} items, total: {len(itens)}")
+                    page += 1
 
             # Vincula todos os itens ao edital, preenchendo sempre os campos oficiais
             itens_ajustados = []
@@ -455,6 +454,61 @@ class EditaisService:
             if str(item.get("edital_ID_C_PNCP", "")) == str(id_c_pncp)
         ]
     
+    def remove_expired_editais(self):
+        """
+        Remove editais cujo prazo de recebimento de propostas já expirou,
+        bem como os itens correspondentes.
+        Editais sem dataEncerramentoProposta são mantidos por segurança.
+        """
+        now = datetime.now()
+        editais = self.data_manager.load_editais()
+        itens = self.data_manager.load_itens()
+
+        editais_ativos = []
+        chaves_ativos = set()
+
+        for edital in editais:
+            data_enc = edital.get("dataEncerramentoProposta")
+            chave = (
+                edital.get("numeroControlePNCP")
+                or edital.get("ID_C_PNCP")
+            )
+            if not data_enc:
+                editais_ativos.append(edital)
+                chaves_ativos.add(chave)
+                continue
+            try:
+                dt = datetime.fromisoformat(data_enc.replace("Z", ""))
+            except Exception:
+                editais_ativos.append(edital)
+                chaves_ativos.add(chave)
+                continue
+            if dt >= now:
+                editais_ativos.append(edital)
+                chaves_ativos.add(chave)
+
+        removidos = len(editais) - len(editais_ativos)
+        if removidos == 0:
+            logger.info("Nenhum edital expirado encontrado.")
+            return {"editais_removidos": 0, "itens_removidos": 0}
+
+        # Filtra itens dos editais que continuam ativos
+        itens_antes = len(itens)
+        itens_ativos = [
+            item for item in itens
+            if (item.get("edital_numeroControlePNCP") or item.get("edital_ID_C_PNCP")) in chaves_ativos
+        ]
+        itens_removidos = itens_antes - len(itens_ativos)
+
+        self.save_editais(editais_ativos)
+        self.data_manager.save_itens(itens_ativos)
+
+        logger.info(
+            f"Limpeza de expirados concluída: {removidos} editais e {itens_removidos} itens removidos. "
+            f"Restam {len(editais_ativos)} editais e {len(itens_ativos)} itens."
+        )
+        return {"editais_removidos": removidos, "itens_removidos": itens_removidos}
+
     def save_editais(self, editais):
         # Garante que ID_C_PNCP seja o primeiro campo de cada edital e sempre exista
         import uuid

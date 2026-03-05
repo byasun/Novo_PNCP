@@ -64,14 +64,35 @@ class DataManager:
             return []
     
     def save_editais(self, editais):
-        # Salva editais em disco
-        try:
-            with open(self.editais_file, "w", encoding="utf-8") as f:
-                json.dump(editais, f, ensure_ascii=False, indent=2)
-            logger.info(f"Saved {len(editais)} editais to {self.editais_file}")
-        except Exception as e:
-            logger.error(f"Error saving editais: {e}")
-            raise
+        # Salva editais em disco com merge incremental
+        # Se arquivo já existe, faz merge ao invés de sobrescrever
+        existing_editais = []
+        if os.path.exists(self.editais_file):
+            try:
+                with open(self.editais_file, "r", encoding="utf-8") as f:
+                    existing_editais = json.load(f)
+            except Exception:
+                pass
+        
+        # Mescla editais por ID_C_PNCP
+        # Mantém todos os antigos e só adiciona/atualiza os novos
+        edital_map = {e.get("ID_C_PNCP"): e for e in existing_editais if e.get("ID_C_PNCP")}
+        for edital in editais:
+            if edital.get("ID_C_PNCP"):
+                edital_map[edital["ID_C_PNCP"]] = edital
+        
+        all_editais = list(edital_map.values())
+        # Nunca sobrescreve com lista vazia - mantém dados existentes se nenhum novo foi adicionado
+        if all_editais:
+            try:
+                with open(self.editais_file, "w", encoding="utf-8") as f:
+                    json.dump(all_editais, f, ensure_ascii=False, indent=2)
+                logger.info(f"Saved {len(all_editais)} editais to {self.editais_file} (merge incremental: {len(existing_editais)} existing + {len(editais)} new/updated)")
+            except Exception as e:
+                logger.error(f"Error saving editais: {e}")
+                raise
+        else:
+            logger.info(f"No editais to save. Keeping {len(existing_editais)} existing editais (merge incremental: {len(existing_editais)} existing + {len(editais)} new/updated)")
     
     def load_editais(self):
         # Carrega editais do disco
@@ -88,15 +109,31 @@ class DataManager:
             logger.error(f"Error loading editais: {e}")
             return []
     
-    def save_itens(self, itens):
+    def save_itens(self, itens, append=False):
         # Salva itens em disco
-        try:
-            with open(self.itens_file, "w", encoding="utf-8") as f:
-                json.dump(itens, f, ensure_ascii=False, indent=2)
-            logger.info(f"Saved {len(itens)} itens to {self.itens_file}")
-        except Exception as e:
-            logger.error(f"Error saving itens: {e}")
-            raise
+        # Se append=True, acrescenta aos existentes. Se False, sobrescreve com a lista fornecida.
+        if append:
+            existing_itens = []
+            if os.path.exists(self.itens_file):
+                try:
+                    with open(self.itens_file, "r", encoding="utf-8") as f:
+                        existing_itens = json.load(f)
+                except Exception:
+                    pass
+            all_itens = existing_itens + itens
+        else:
+            all_itens = itens
+        
+        if all_itens:
+            try:
+                with open(self.itens_file, "w", encoding="utf-8") as f:
+                    json.dump(all_itens, f, ensure_ascii=False)
+                logger.info(f"Saved {len(all_itens)} itens to {self.itens_file}")
+            except Exception as e:
+                logger.error(f"Error saving itens: {e}")
+                raise
+        else:
+            logger.info(f"No itens to save.")
     
     def load_itens(self):
         # Carrega itens do disco
